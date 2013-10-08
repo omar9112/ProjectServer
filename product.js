@@ -1,13 +1,13 @@
 module.exports =  { 
-	Product : function (name, model, instantPrice, bidPrice, description, photo, brand, dimensions){
+	Product : function (name, model, brand, category, condition, priceMethod, price, description){
 		this.id = "";
 		this.name = name;
 		this.model = model;
-		this.instantPrice = instantPrice;
-		this.bidPrice = bidPrice;
-		this.description = description;
-		this.photo = photo;
 		this.brand = brand;
-		this.dimensions = dimensions;
+		this.category = category;
+		this.condition = condition;
+		this.priceMethod = priceMethod;
+		this.price = price;
+		this.description = description;
 	}
 };
