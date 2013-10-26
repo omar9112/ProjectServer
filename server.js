@@ -1,6 +1,8 @@
 // Express is the web framework 
 var express = require('express');
+var pg = require('pg');
 var app = express();
+
 var allowCrossDomain = function(req, res, next) {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
@@ -38,6 +40,10 @@ var productNextId = 0;
 for (var i=0; i < productList.length;++i){
 	productList[i].id = productNextId++;
 }
+
+// Database connection string: pg://<username>:<password>@host:port/dbname 
+var conString = "pg://omar91:000569@localhost:5432/kiwidb";
+
 // REST Operations
 // Idea: Data is created, read, updated, or deleted through a URL that 
 // identifies the resource to be created, read, updated, or deleted.
@@ -51,43 +57,98 @@ for (var i=0; i < productList.length;++i){
 // REST Operation - HTTP GET to read all products
 app.get('/ProjectServer/products', function(req, res) {
 	console.log("GET");
-	var response = {"products" : productList};
-  	res.json(response);
+	
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT * from product");
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var response = {"products" : result.rows};
+		client.end();
+  		res.json(response);
+ 	});
 });
+
+// // REST Operation - HTTP GET to read all products from a category
+// app.get('/ProjectServer/categories/:category', function(req, res) {
+	// var category = req.params.category;
+	// console.log("GET category: " + category);
+// 	
+	// var client = new pg.Client(conString);
+	// client.connect();
+// 
+	// // var query = client.query("SELECT * from product");
+	// var query = client.query("SELECT * from product natural join category where category_name =  $1", category);
+// 
+	// query.on("row", function (row, result) {
+    	// result.addRow(row);
+	// });
+	// query.on("end", function (result) {
+		// var response = {"products" : result.rows};
+		// client.end();
+  		// res.json(response);
+ 	// });
+// });
 
 // REST Operation - HTTP GET to read a product based on its id
 app.get('/ProjectServer/products/:id', function(req, res) {
 	var id = req.params.id;
-		console.log("GET product: " + id);
+	console.log("GET product: " + id);
 
-	if ((id < 0) || (id >= productNextId)){
-		// not found
-		res.statusCode = 404;
-		res.send("Product not found.");
-	}
-	else {
-		var target = -1;
-		for (var i=0; i < productList.length; ++i){
-			if (productList[i].id == id){
-				target = i;
-				break;	
-			}
-		}
-		if (target == -1){
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT * from product where pid = $1", [id]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
 			res.statusCode = 404;
 			res.send("Product not found.");
 		}
-		else {
-			var response = {"product" : productList[target]};
-  			res.json(response);	
-  		}	
-	}
+		else {	
+  			var response = {"product" : result.rows[0]};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+	
+	// if ((id < 0) || (id >= productNextId)){
+		// // not found
+		// res.statusCode = 404;
+		// res.send("Product not found.");
+	// }
+	// else {
+		// var target = -1;
+		// for (var i=0; i < productList.length; ++i){
+			// if (productList[i].id == id){
+				// target = i;
+				// break;	
+			// }
+		// }
+		// if (target == -1){
+			// res.statusCode = 404;
+			// res.send("Product not found.");
+		// }
+		// else {
+			// var response = {"product" : productList[target]};
+  			// res.json(response);	
+  		// }	
+	// }
 });
+
 
 // REST Operation - HTTP PUT to updated a product based on its id
 app.put('/ProjectServer/products/:id', function(req, res) {
 	var id = req.params.id;
-		console.log("PUT product: " + id);
+	console.log("PUT product: " + id);
 
 	if ((id < 0) || (id >= productNextId)){
 		// not found
@@ -343,6 +404,84 @@ app.post('/ProjectServer/users', function(req, res) {
   	res.json(true);
 });
 
+/*
+ * ################################## CATEGORY ##################################
+ */
+
+var category = require("./category.js");
+var Category = category.Category;
+
+var categoryList = new Array(
+	new Category("phones")	
+);
+ var categoryNextId = 0;
+ 
+for (var i=0; i < categoryList.length;++i){
+	categoryList[i].id = categoryNextId++;
+}
+// REST Operations
+// Idea: Data is created, read, updated, or deleted through a URL that 
+// identifies the resource to be created, read, updated, or deleted.
+// The URL and any other input data is sent over standard HTTP requests.
+// Mapping of HTTP with REST 
+// a) POST - Created a new object. (Database create operation)
+// b) GET - Read an individual object, collection of object, or simple values (Database read Operation)
+// c) PUT - Update an individual object, or collection  (Database update operation)
+// d) DELETE - Remove an individual object, or collection (Database delete operation)
+
+// // REST Operation - HTTP GET to read all categories
+// app.get('/ProjectServer/categories', function(req, res) {
+	// console.log("GET categories");
+	// var response = {"categories" : categoryList};
+  	// res.json(response);
+// });
+
+// REST Operation - HTTP GET to read all products from a category
+app.get('/ProjectServer/categories', function(req, res) {
+	console.log("GET categories");
+	
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT * from category");
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var response = {"categories" : result.rows};
+		client.end();
+  		res.json(response);
+ 	});
+});
+
+// REST Operation - HTTP GET to read a product based on its category
+app.get('/ProjectServer/categories/:category', function(req, res) {
+	var category = req.params.category;
+	console.log("GET product from: " + category);
+
+	var client = new pg.Client(conString);
+	client.connect();
+
+	// var query = client.query("SELECT * from product natural join category where category_name = $1", [category]);
+	var query = client.query("SELECT * from product natural join category where $1 = any (category_name)", [category]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Product not found.");
+		}
+		else {	
+  			var response = {"categories" : result.rows};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
 
 // Server starts running when listen is called.
 app.listen(process.env.PORT || 3412);
