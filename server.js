@@ -1,6 +1,7 @@
 // Express is the web framework 
 var express = require('express');
-var pg = require('pg');
+// var pg = require('pg');
+var pg = require('pg').native;
 var app = express();
 
 var allowCrossDomain = function(req, res, next) {
@@ -42,7 +43,9 @@ for (var i=0; i < productList.length;++i){
 }
 
 // Database connection string: pg://<username>:<password>@host:port/dbname 
-var conString = "pg://omar91:000569@localhost:5432/kiwidb";
+// var conString = "pg://omar91:000569@localhost:5432/kiwidb";
+var conString = "pg://fjupgmyvemqepn:cubKJkYRU__l8azH1vtHXngBjJ@ec2-54-204-17-24.compute-1.amazonaws.com:5432/da7jluqsdd1u63";
+
 
 // REST Operations
 // Idea: Data is created, read, updated, or deleted through a URL that 
