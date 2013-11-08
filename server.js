@@ -1,4 +1,4 @@
-// Express is the web framework 
+// Express is the web framework
 var express = require('express');
 // var pg = require('pg');
 var app = express();
