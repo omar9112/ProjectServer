@@ -56,7 +56,6 @@ function findById(id, fn) {
   
 }
 
-var user = {};
 function findByUsername(username, password, fn) {
   var client = new pg.Client(conString);
   client.connect();
@@ -73,7 +72,7 @@ function findByUsername(username, password, fn) {
     }
     else {  
         // var response = {"user" : result.rows[0]};
-        user = result.rows[0];
+        var user = result.rows[0];
         console.log("GET username: " + result.rows[0].username);
         console.log("GET password: " + result.rows[0].upassword);
         client.end();
@@ -141,8 +140,9 @@ app.configure(function() {
   app.use(express.static(__dirname + '/../../public'));
 });
 
-
+var currentUser = {};
 app.get('/', ensureAuthenticated, function(req, res){
+	currentUser = req.user;
   res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
 });
 
@@ -183,6 +183,10 @@ function ensureAuthenticated(req, res, next) {
   res.redirect('/login');
 }
 
+
+function getCurrentUser (argument) {
+  
+}
 
 // function restrict(req, res, next) {
   // if (req.session.user) {
@@ -279,7 +283,7 @@ app.get('/ProjectServer/currentUser', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT * from customer where uid = $1", [user.uid]);
+	var query = client.query("SELECT * from customer where uid = $1", [currentUsers.uid]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
