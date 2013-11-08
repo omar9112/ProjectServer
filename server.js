@@ -73,7 +73,7 @@ function findByUsername(username, password, fn) {
     }
     else {  
         // var response = {"user" : result.rows[0]};
-         user = result.rows[0];
+        user = result.rows[0];
         console.log("GET username: " + result.rows[0].username);
         console.log("GET password: " + result.rows[0].upassword);
         client.end();
@@ -273,6 +273,25 @@ var Product = product.Product;
 // d) DELETE - Remove an individual object, or collection (Database delete operation)
 
 // REST Operation - HTTP GET to read all products
+app.get('/ProjectServer/currentUser', function(req, res) {
+	console.log("GET");
+	
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT * from customer where uid = $1", [user.uid]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var response = {"user" : result.rows};
+		client.end();
+  		res.json(response);
+ 	});
+});
+
+// REST Operation - HTTP GET to read all products
 app.get('/ProjectServer/products', function(req, res) {
 	console.log("GET");
 	
@@ -416,8 +435,8 @@ app.post('/ProjectServer/products', function(req, res) {
  * ################################## USER ##################################
  */
 
-var user = require("./user.js");
-var User = user.User;
+var usercopy = require("./user.js");
+var User = usercopy.User;
 
 var userList = new Array(
 	new User("christian.montes", "chris123", "Christian", "Montes", "calle Amazonas", "Ponce", "PR", "00728", "calle Amazonas", "Ponce", "PR", "00728", "7872315270", "chris.omar91@me.com" , 5)	
