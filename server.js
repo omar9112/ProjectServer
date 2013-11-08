@@ -27,6 +27,33 @@ app.configure(function () {
   app.use(allowCrossDomain);
 });
 
+// REST Operation - HTTP GET to read a product based on its id
+app.get('/ProjectServer/users/:id', function(req, res) {
+	var id = req.params.uid;
+	console.log("GET user: " + id);
+
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT * FROM customer where uid = $1", [id]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Product not found.");
+		}
+		else {	
+  			var response = {"user" : result.rows[0]};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
+
 function findById(id, fn) {
   var client = new pg.Client(conString);
   client.connect();
@@ -38,9 +65,6 @@ function findById(id, fn) {
   query.on("end", function (result) {
     var len = result.rows.length;
     if (len == 0){
-      // res.statusCode = 404;
-      // res.send("User not found.");
-      //return fn(null, null);
       fn(new Error('User ' + id + ' does not exist'));
     }
     else {  
@@ -51,12 +75,12 @@ function findById(id, fn) {
         client.end();
          fn(null, result.rows[0]);
         
-      
-        // res.json(response);
       }
   });
   
 }
+
+var currentUser;
 
 function findByUsername(username, password, fn) {
   var client = new pg.Client(conString);
@@ -74,17 +98,14 @@ function findByUsername(username, password, fn) {
     }
     else {  
         // var response = {"user" : result.rows[0]};
-        var user = result.rows[0];
+        currentUser = result.rows[0];
         console.log("GET username: " + result.rows[0].username);
         console.log("GET password: " + result.rows[0].upassword);
         client.end();
         return fn(null, user);
         
-      
-        // res.json(response);
       }
   });
-  // return fn(null, null);
 }
 
 
@@ -102,7 +123,6 @@ passport.deserializeUser(function(uid, done) {
     done(err, user);
   });
 });
-
 
 // Use the LocalStrategy within Passport.
 //   Strategies in passport require a `verify` function, which accept
@@ -147,21 +167,16 @@ app.configure(function() {
 
 
 app.get('/', ensureAuthenticated, function(req, res){
-  // res.render('index', { user: req.user });
   res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
-  // res.render('index.html', { user: req.user });
 });
 
 app.get('/account', ensureAuthenticated, function(req, res){
   res.render('account', { user: req.user });
-  // res.render('account.html', { user: req.user });
 
 });
 
 app.get('/login', function(req, res){
-//   res.render('login', { user: req.user, message: req.flash('error') });
 	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/login.html');
-  // res.render('login.html', { user: req.user, message: req.flash('error') });
 });
 
 // POST /login
@@ -175,33 +190,12 @@ app.post('/login',
   passport.authenticate('local', { failureRedirect: '/login', failureFlash: true }),
   function(req, res) {
   	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
-//     res.redirect('/');
   });
-  
-// POST /login
-//   This is an alternative implementation that uses a custom callback to
-//   acheive the same functionality.
-/*
-app.post('/login', function(req, res, next) {
-  passport.authenticate('local', function(err, user, info) {
-    if (err) { return next(err) }
-    if (!user) {
-      req.flash('error', info.message);
-      return res.redirect('/login')
-    }
-    req.logIn(user, function(err) {
-      if (err) { return next(err); }
-      return res.redirect('/users/' + user.username);
-    });
-  })(req, res, next);
-});
-*/
 
 app.get('/logout', function(req, res){
   req.logout();
   res.redirect('/');
 });
-
 
 // Simple route middleware to ensure user is authenticated.
 //   Use this route middleware on any resource that needs to be protected.  If
@@ -212,77 +206,6 @@ function ensureAuthenticated(req, res, next) {
   if (req.isAuthenticated()) { return next(); }
   res.redirect('/login');
 }
-
-
-// function restrict(req, res, next) {
-  // if (req.session.user) {
-    // next();
-  // } else {
-    // req.session.error = 'Access denied!';
-    // res.redirect('/login');
-  // }
-// }
-//  
-// // app.get('/', function(request, response) {
-   // // response.redirect('http://10.0.1.20:8020/ICOM-5016/ProjectClient/index.html');
-// // });
-//  
-// app.get('/login', function(request, response) {
-   // response.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/login.html');
-// });
-// 
-// function findByUsername(username, password, fn) {
-  // var client = new pg.Client(conString);
-  // client.connect();
-// 
-  // var query = client.query("SELECT * FROM customer where username = $1 AND upassword", [username]);
-// 
-  // query.on("row", function (row, result) {
-      // result.addRow(row);
-  // });
-  // query.on("end", function (result) {
-    // var len = result.rows.length;
-    // if (len == 0){
-      // return fn(null, null);
-    // }
-    // else {  
-        // // var response = {"user" : result.rows[0]};
-        // var user = result.rows[0];
-        // console.log("GET username: " + result.rows[0].username);
-        // console.log("GET password: " + result.rows[0].upassword);
-        // client.end();
-        // return fn(null, user);
-//         
-       // }
-  // });
-// }
-//  
-// app.post('/login', function(request, response) {
-//  
-    // var username = request.body.username;
-    // var password = request.body.password;
-//  
-    // if(username == 'demo' && password == 'demo'){
-        // request.session.regenerate(function(){
-        // request.session.user = username;
-        // response.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
-        // });
-    // }
-    // else {
-       // response.redirect('/login');
-    // }    
-// });
-//  
-// app.get('/logout', function(request, response){
-    // request.session.destroy(function(){
-        // response.redirect('/');
-    // });
-// });
-//  
-// app.get('/', restrict, function(request, response){
-  // // response.send('This is the restricted area! Hello ' + request.session.user + '! click <a href="/logout">here to logout</a>');
-  // response.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
-//});
 
 var product = require("./product.js");
 var Product = product.Product;
@@ -318,6 +241,33 @@ app.get('/ProjectServer/products', function(req, res) {
 		var response = {"products" : result.rows};
 		client.end();
   		res.json(response);
+ 	});
+});
+
+// REST Operation - HTTP GET to read a product based on its id
+app.get('/ProjectServer/currentUser/', function(req, res) {
+	// var id = req.params.id;
+	console.log("GET user: " + currentUser.uid);
+
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT * FROM customer WHERE uid = $1", [currentUser.uid]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Product not found.");
+		}
+		else {	
+  			var response = {"currentUser" : result.rows[0]};
+			client.end();
+  			res.json(response);
+  		}
  	});
 });
 
