@@ -1,8 +1,13 @@
 // Express is the web framework
-var express = require('express');
-// var pg = require('pg');
+var flash = require('connect-flash')
+  , express = require('express')
+  , passport = require('passport')
+  , util = require('util')
+  , LocalStrategy = require('passport-local').Strategy
+  , pg = require('pg').native;
+  
 var app = express();
-var pg = require('pg');
+var conString = "pg://fjupgmyvemqepn:cubKJkYRU__l8azH1vtHXngBjJ@ec2-54-204-17-24.compute-1.amazonaws.com:5432/da7jluqsdd1u63";
 
 var allowCrossDomain = function(req, res, next) {
     res.header('Access-Control-Allow-Origin', '*');
@@ -22,60 +27,269 @@ app.configure(function () {
   app.use(allowCrossDomain);
 });
 
+function findById(id, fn) {
+  var client = new pg.Client(conString);
+  client.connect();
+  var query = client.query("SELECT * FROM customer where uid = $1", [id]);
 
-app.use(express.bodyParser());
-app.use(express.cookieParser('shhhh, very secret'));
-app.use(express.session());
-
-function restrict(req, res, next) {
-  if (req.session.user) {
-    next();
-  } else {
-    req.session.error = 'Access denied!';
-    res.redirect('/login');
-  }
-}
- 
-// app.get('/', function(request, response) {
-   // response.redirect('http://10.0.1.20:8020/ICOM-5016/ProjectClient/index.html');
-// });
- 
-app.get('/login', function(request, response) {
-   response.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/login.html');
-});
- 
-app.post('/login', function(request, response) {
- 
-    var username = request.body.username;
-    var password = request.body.password;
- 
-    if(username == 'demo' && password == 'demo'){
-        request.session.regenerate(function(){
-        request.session.user = username;
-        response.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
-        });
+  query.on("row", function (row, result) {
+      result.addRow(row);
+  });
+  query.on("end", function (result) {
+    var len = result.rows.length;
+    if (len == 0){
+      // res.statusCode = 404;
+      // res.send("User not found.");
+      //return fn(null, null);
+      fn(new Error('User ' + id + ' does not exist'));
     }
-    else {
-       response.redirect('/login');
-    }    
+    else {  
+        // var response = {"user" : result.rows[0]};
+        var user = result.rows[0];
+        console.log("GET username by Id: " + result.rows[0].username);
+        console.log("GET password by Id: " + result.rows[0].upassword);
+        client.end();
+         fn(null, result.rows[0]);
+        
+      
+        // res.json(response);
+      }
+  });
+  
+}
+
+function findByUsername(username, password, fn) {
+  var client = new pg.Client(conString);
+  client.connect();
+
+  var query = client.query("SELECT * FROM customer where username = $1 AND upassword = $2", [username, password]);
+
+  query.on("row", function (row, result) {
+      result.addRow(row);
+  });
+  query.on("end", function (result) {
+    var len = result.rows.length;
+    if (len == 0){
+      return fn(null, null);
+    }
+    else {  
+        // var response = {"user" : result.rows[0]};
+        var user = result.rows[0];
+        console.log("GET username: " + result.rows[0].username);
+        console.log("GET password: " + result.rows[0].upassword);
+        client.end();
+        return fn(null, user);
+        
+      
+        // res.json(response);
+      }
+  });
+  // return fn(null, null);
+}
+
+
+// Passport session setup.
+//   To support persistent login sessions, Passport needs to be able to
+//   serialize users into and deserialize users out of the session.  Typically,
+//   this will be as simple as storing the user ID when serializing, and finding
+//   the user by ID when deserializing.
+passport.serializeUser(function(user, done) {
+  done(null, user.uid);
 });
- 
-app.get('/logout', function(request, response){
-    request.session.destroy(function(){
-        response.redirect('/');
+
+passport.deserializeUser(function(uid, done) {
+  findById(uid, function (err, user) {
+    done(err, user);
+  });
+});
+
+
+// Use the LocalStrategy within Passport.
+//   Strategies in passport require a `verify` function, which accept
+//   credentials (in this case, a username and password), and invoke a callback
+//   with a user object.  In the real world, this would query a database;
+//   however, in this example we are using a baked-in set of users.
+passport.use(new LocalStrategy(
+  function(username, password, done) {
+    // asynchronous verification, for effect...
+    process.nextTick(function () {
+      
+      // Find the user by username.  If there is no user with the given
+      // username, or the password is not correct, set the user to `false` to
+      // indicate failure and set a flash message.  Otherwise, return the
+      // authenticated `user`.
+      findByUsername(username, password, function(err, user) {
+        if (err) { return done(err); }
+        if (!user) { return done(null, false, { message: 'Unknown user ' + username }); }
+//         if (user.upassword != password) { return done(null, false, { message: 'Invalid password' }); }
+        return done(null, user);
+      });
     });
+  }
+));
+
+
+// configure Express
+app.configure(function() {
+  app.use(express.logger());
+  app.use(express.cookieParser('shhhh, very secret'));
+  app.use(express.bodyParser());
+  app.use(express.methodOverride());
+  app.use(express.session({ secret: 'keyboard cat' }));
+  // Initialize Passport!  Also use passport.session() middleware, to support
+  // persistent login sessions (recommended).
+  app.use(flash());
+  app.use(passport.initialize());
+  app.use(passport.session());
+  app.use(app.router);
+  app.use(express.static(__dirname + '/../../public'));
 });
- 
-app.get('/', restrict, function(request, response){
-  // response.send('This is the restricted area! Hello ' + request.session.user + '! click <a href="/logout">here to logout</a>');
+
+
+app.get('/', ensureAuthenticated, function(req, res){
+  // res.render('index', { user: req.user });
+  res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
+  // res.render('index.html', { user: req.user });
 });
+
+app.get('/account', ensureAuthenticated, function(req, res){
+  res.render('account', { user: req.user });
+  // res.render('account.html', { user: req.user });
+
+});
+
+app.get('/login', function(req, res){
+//   res.render('login', { user: req.user, message: req.flash('error') });
+	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/login.html');
+  // res.render('login.html', { user: req.user, message: req.flash('error') });
+});
+
+// POST /login
+//   Use passport.authenticate() as route middleware to authenticate the
+//   request.  If authentication fails, the user will be redirected back to the
+//   login page.  Otherwise, the primary route function function will be called,
+//   which, in this example, will redirect the user to the home page.
+//
+//   curl -v -d "username=bob&password=secret" http://127.0.0.1:3000/login
+app.post('/login', 
+  passport.authenticate('local', { failureRedirect: '/login', failureFlash: true }),
+  function(req, res) {
+  	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
+//     res.redirect('/');
+  });
+  
+// POST /login
+//   This is an alternative implementation that uses a custom callback to
+//   acheive the same functionality.
+/*
+app.post('/login', function(req, res, next) {
+  passport.authenticate('local', function(err, user, info) {
+    if (err) { return next(err) }
+    if (!user) {
+      req.flash('error', info.message);
+      return res.redirect('/login')
+    }
+    req.logIn(user, function(err) {
+      if (err) { return next(err); }
+      return res.redirect('/users/' + user.username);
+    });
+  })(req, res, next);
+});
+*/
+
+app.get('/logout', function(req, res){
+  req.logout();
+  res.redirect('/');
+});
+
+
+// Simple route middleware to ensure user is authenticated.
+//   Use this route middleware on any resource that needs to be protected.  If
+//   the request is authenticated (typically via a persistent login session),
+//   the request will proceed.  Otherwise, the user will be redirected to the
+//   login page.
+function ensureAuthenticated(req, res, next) {
+  if (req.isAuthenticated()) { return next(); }
+  res.redirect('/login');
+}
+
+
+// function restrict(req, res, next) {
+  // if (req.session.user) {
+    // next();
+  // } else {
+    // req.session.error = 'Access denied!';
+    // res.redirect('/login');
+  // }
+// }
+//  
+// // app.get('/', function(request, response) {
+   // // response.redirect('http://10.0.1.20:8020/ICOM-5016/ProjectClient/index.html');
+// // });
+//  
+// app.get('/login', function(request, response) {
+   // response.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/login.html');
+// });
+// 
+// function findByUsername(username, password, fn) {
+  // var client = new pg.Client(conString);
+  // client.connect();
+// 
+  // var query = client.query("SELECT * FROM customer where username = $1 AND upassword", [username]);
+// 
+  // query.on("row", function (row, result) {
+      // result.addRow(row);
+  // });
+  // query.on("end", function (result) {
+    // var len = result.rows.length;
+    // if (len == 0){
+      // return fn(null, null);
+    // }
+    // else {  
+        // // var response = {"user" : result.rows[0]};
+        // var user = result.rows[0];
+        // console.log("GET username: " + result.rows[0].username);
+        // console.log("GET password: " + result.rows[0].upassword);
+        // client.end();
+        // return fn(null, user);
+//         
+       // }
+  // });
+// }
+//  
+// app.post('/login', function(request, response) {
+//  
+    // var username = request.body.username;
+    // var password = request.body.password;
+//  
+    // if(username == 'demo' && password == 'demo'){
+        // request.session.regenerate(function(){
+        // request.session.user = username;
+        // response.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
+        // });
+    // }
+    // else {
+       // response.redirect('/login');
+    // }    
+// });
+//  
+// app.get('/logout', function(request, response){
+    // request.session.destroy(function(){
+        // response.redirect('/');
+    // });
+// });
+//  
+// app.get('/', restrict, function(request, response){
+  // // response.send('This is the restricted area! Hello ' + request.session.user + '! click <a href="/logout">here to logout</a>');
+  // response.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
+//});
 
 var product = require("./product.js");
 var Product = product.Product;
 
 // Database connection string: pg://<username>:<password>@host:port/dbname 
 // var conString = "pg://omar91:000569@localhost:5432/kiwidb";
-var conString = "pg://fjupgmyvemqepn:cubKJkYRU__l8azH1vtHXngBjJ@ec2-54-204-17-24.compute-1.amazonaws.com:5432/da7jluqsdd1u63";
+// var conString = "pg://fjupgmyvemqepn:cubKJkYRU__l8azH1vtHXngBjJ@ec2-54-204-17-24.compute-1.amazonaws.com:5432/da7jluqsdd1u63";
 
 
 // REST Operations
