@@ -80,7 +80,7 @@ function findById(id, fn) {
   
 }
 
-var currentUser;
+var currentUser = {};
 
 function findByUsername(username, password, fn) {
   var client = new pg.Client(conString);
