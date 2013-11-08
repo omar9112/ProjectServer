@@ -41,7 +41,7 @@ function restrict(req, res, next) {
 // });
  
 app.get('/login', function(request, response) {
-   response.redirect('http://10.0.1.20:8020/ICOM-5016/ProjectClient/login.html');
+   response.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/login.html');
 });
  
 app.post('/login', function(request, response) {
@@ -52,7 +52,7 @@ app.post('/login', function(request, response) {
     if(username == 'demo' && password == 'demo'){
         request.session.regenerate(function(){
         request.session.user = username;
-        response.redirect('http://10.0.1.20:8020/ICOM-5016/ProjectClient/index.html');
+        response.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
         });
     }
     else {
