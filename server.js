@@ -102,7 +102,7 @@ function findByUsername(username, password, fn) {
         console.log("GET username: " + result.rows[0].username);
         console.log("GET password: " + result.rows[0].upassword);
         client.end();
-        return fn(null, user);
+        return fn(null, currentUser);
         
       }
   });
