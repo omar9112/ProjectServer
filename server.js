@@ -236,7 +236,7 @@ var user = require("./user.js");
 var User = user.User;
 
 var userList = new Array(
-	new User("jose.virella", "ICOM-5016", "test", "test", "calle Amazonas", "Ponce", "PR", "00728", "calle Amazonas", "Ponce", "PR", "00728", "7872315270", "chris.omar91@me.com" , 5)	
+	new User("christian.montes", "chris123", "Christian", "Montes", "calle Amazonas", "Ponce", "PR", "00728", "calle Amazonas", "Ponce", "PR", "00728", "7872315270", "chris.omar91@me.com" , 5)	
 );
  var userNextId = 0;
  
