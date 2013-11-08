@@ -1,8 +1,8 @@
 // Express is the web framework 
 var express = require('express');
 // var pg = require('pg');
-var pg = require('pg').native;
 var app = express();
+var pg = require('pg').native;
 
 var allowCrossDomain = function(req, res, next) {
     res.header('Access-Control-Allow-Origin', '*');
@@ -24,23 +24,54 @@ app.configure(function () {
 
 
 app.use(express.bodyParser());
+app.use(express.cookieParser('shhhh, very secret'));
+app.use(express.session());
+
+function restrict(req, res, next) {
+  if (req.session.user) {
+    next();
+  } else {
+    req.session.error = 'Access denied!';
+    res.redirect('/login');
+  }
+}
+ 
+// app.get('/', function(request, response) {
+   // response.redirect('http://10.0.1.20:8020/ICOM-5016/ProjectClient/index.html');
+// });
+ 
+app.get('/login', function(request, response) {
+   response.redirect('http://10.0.1.20:8020/ICOM-5016/ProjectClient/login.html');
+});
+ 
+app.post('/login', function(request, response) {
+ 
+    var username = request.body.username;
+    var password = request.body.password;
+ 
+    if(username == 'demo' && password == 'demo'){
+        request.session.regenerate(function(){
+        request.session.user = username;
+        response.redirect('http://10.0.1.20:8020/ICOM-5016/ProjectClient/index.html');
+        });
+    }
+    else {
+       response.redirect('/login');
+    }    
+});
+ 
+app.get('/logout', function(request, response){
+    request.session.destroy(function(){
+        response.redirect('/');
+    });
+});
+ 
+app.get('/', restrict, function(request, response){
+  // response.send('This is the restricted area! Hello ' + request.session.user + '! click <a href="/logout">here to logout</a>');
+});
 
 var product = require("./product.js");
 var Product = product.Product;
-
-var productList = new Array(
-	new Product("iPhone 5S", "A1429", "Apple", ["children", "tv"], "used", "Instant", "600", "Tu madre"),
-    new Product("Samsung Galaxy S4", "S4" , "Samsung", ["tv","shoes"], "used", "Instant", "500", "Tu madre"),
-    new Product("HTC One", "One", "HTC", ["shoes","men"], "used", "Bid", "650", "Tu madre"),
-    new Product("Nexus 4", "LG-E960", "LG", ["men","laptop"], "used", "Instant", "600", "Tu madre"),
-    new Product("LG G2", "LG-D820", "LG", ["laptop","children"], "used", "Bid", "600", "Tu madre")	
-);
-
-var productNextId = 0;
- 
-for (var i=0; i < productList.length;++i){
-	productList[i].id = productNextId++;
-}
 
 // Database connection string: pg://<username>:<password>@host:port/dbname 
 // var conString = "pg://omar91:000569@localhost:5432/kiwidb";
@@ -76,27 +107,6 @@ app.get('/ProjectServer/products', function(req, res) {
  	});
 });
 
-// // REST Operation - HTTP GET to read all products from a category
-// app.get('/ProjectServer/categories/:category', function(req, res) {
-	// var category = req.params.category;
-	// console.log("GET category: " + category);
-// 	
-	// var client = new pg.Client(conString);
-	// client.connect();
-// 
-	// // var query = client.query("SELECT * from product");
-	// var query = client.query("SELECT * from product natural join category where category_name =  $1", category);
-// 
-	// query.on("row", function (row, result) {
-    	// result.addRow(row);
-	// });
-	// query.on("end", function (result) {
-		// var response = {"products" : result.rows};
-		// client.end();
-  		// res.json(response);
- 	// });
-// });
-
 // REST Operation - HTTP GET to read a product based on its id
 app.get('/ProjectServer/products/:id', function(req, res) {
 	var id = req.params.id;
@@ -122,29 +132,6 @@ app.get('/ProjectServer/products/:id', function(req, res) {
   			res.json(response);
   		}
  	});
-	
-	// if ((id < 0) || (id >= productNextId)){
-		// // not found
-		// res.statusCode = 404;
-		// res.send("Product not found.");
-	// }
-	// else {
-		// var target = -1;
-		// for (var i=0; i < productList.length; ++i){
-			// if (productList[i].id == id){
-				// target = i;
-				// break;	
-			// }
-		// }
-		// if (target == -1){
-			// res.statusCode = 404;
-			// res.send("Product not found.");
-		// }
-		// else {
-			// var response = {"product" : productList[target]};
-  			// res.json(response);	
-  		// }	
-	// }
 });
 
 
