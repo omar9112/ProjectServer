@@ -80,8 +80,6 @@ function findById(id, fn) {
   
 }
 
-var currentUser = {};
-
 function findByUsername(username, password, fn) {
   var client = new pg.Client(conString);
   client.connect();
@@ -98,11 +96,11 @@ function findByUsername(username, password, fn) {
     }
     else {  
         // var response = {"user" : result.rows[0]};
-        currentUser = result.rows[0];
+        var user = result.rows[0];
         console.log("GET username: " + result.rows[0].username);
         console.log("GET password: " + result.rows[0].upassword);
         client.end();
-        return fn(null, currentUser);
+        return fn(null, user);
         
       }
   });
@@ -241,33 +239,6 @@ app.get('/ProjectServer/products', function(req, res) {
 		var response = {"products" : result.rows};
 		client.end();
   		res.json(response);
- 	});
-});
-
-// REST Operation - HTTP GET to read a product based on its id
-app.get('/ProjectServer/currentUser/', function(req, res) {
-	// var id = req.params.id;
-	console.log("GET user: " + currentUser.uid);
-
-	var client = new pg.Client(conString);
-	client.connect();
-
-	var query = client.query("SELECT * FROM customer WHERE uid = $1", [currentUser.uid]);
-	
-	query.on("row", function (row, result) {
-    	result.addRow(row);
-	});
-	query.on("end", function (result) {
-		var len = result.rows.length;
-		if (len == 0){
-			res.statusCode = 404;
-			res.send("Product not found.");
-		}
-		else {	
-  			var response = {"currentUser" : result.rows[0]};
-			client.end();
-  			res.json(response);
-  		}
  	});
 });
 
