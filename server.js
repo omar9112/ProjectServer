@@ -2,7 +2,7 @@
 var express = require('express');
 // var pg = require('pg');
 var app = express();
-var pg = require('pg').native;
+var pg = require('pg');
 
 var allowCrossDomain = function(req, res, next) {
     res.header('Access-Control-Allow-Origin', '*');
