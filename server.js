@@ -9,6 +9,8 @@ var flash = require('connect-flash')
 var app = express();
 var conString = "pg://fjupgmyvemqepn:cubKJkYRU__l8azH1vtHXngBjJ@ec2-54-204-17-24.compute-1.amazonaws.com:5432/da7jluqsdd1u63";
 
+var currentUser = {};
+
 var allowCrossDomain = function(req, res, next) {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
@@ -45,6 +47,7 @@ function findById(id, fn) {
     }
     else {  
         // var response = {"user" : result.rows[0]};
+        var currentUser = result.rows[0];
         var user = result.rows[0];
         console.log("GET username by Id: " + result.rows[0].username);
         console.log("GET password by Id: " + result.rows[0].upassword);
@@ -140,9 +143,7 @@ app.configure(function() {
   app.use(express.static(__dirname + '/../../public'));
 });
 
-var currentUser = {};
 app.get('/', ensureAuthenticated, function(req, res){
-	currentUser = req.user;
   res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
 });
 
@@ -181,11 +182,6 @@ app.get('/logout', function(req, res){
 function ensureAuthenticated(req, res, next) {
   if (req.isAuthenticated()) { return next(); }
   res.redirect('/login');
-}
-
-
-function getCurrentUser (argument) {
-  
 }
 
 // function restrict(req, res, next) {
