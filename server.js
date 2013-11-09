@@ -222,6 +222,24 @@ app.get('/ProjectServer/currentUser', function(req, res) {
  	});
 });
 
+app.get('/ProjectServer/currentUserCart', function(req, res) {
+	console.log("GET");
+	
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT * FROM (customer NATURAL JOIN shoppingcart), product WHERE shoppingcart.pid = product.pid AND customer.uid = $1", [currentUser.uid]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var response = {"shppingcart" : result.rows};
+		client.end();
+  		res.json(response);
+ 	});
+});
+
 // REST Operation - HTTP GET to read a product based on its id
 app.get('/ProjectServer/currentProductSeller/:id', function(req, res) {
 	var id = req.params.id;
