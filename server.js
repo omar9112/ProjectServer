@@ -283,7 +283,7 @@ app.get('/ProjectServer/currentUser', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT * from customer where uid = $1", [currentUsers.uid]);
+	var query = client.query("SELECT * from customer where uid = $1", [currentUser.uid]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
