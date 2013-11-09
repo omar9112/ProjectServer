@@ -47,7 +47,7 @@ function findById(id, fn) {
     }
     else {  
         // var response = {"user" : result.rows[0]};
-        currentUser = result.rows[0];
+        // currentUser = result.rows[0];
         var user = result.rows[0];
         console.log("GET username by Id: " + result.rows[0].username);
         console.log("GET password by Id: " + result.rows[0].upassword);
