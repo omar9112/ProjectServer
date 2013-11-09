@@ -185,76 +185,6 @@ function ensureAuthenticated(req, res, next) {
   res.redirect('/login');
 }
 
-// function restrict(req, res, next) {
-  // if (req.session.user) {
-    // next();
-  // } else {
-    // req.session.error = 'Access denied!';
-    // res.redirect('/login');
-  // }
-// }
-//  
-// // app.get('/', function(request, response) {
-   // // response.redirect('http://10.0.1.20:8020/ICOM-5016/ProjectClient/index.html');
-// // });
-//  
-// app.get('/login', function(request, response) {
-   // response.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/login.html');
-// });
-// 
-// function findByUsername(username, password, fn) {
-  // var client = new pg.Client(conString);
-  // client.connect();
-// 
-  // var query = client.query("SELECT * FROM customer where username = $1 AND upassword", [username]);
-// 
-  // query.on("row", function (row, result) {
-      // result.addRow(row);
-  // });
-  // query.on("end", function (result) {
-    // var len = result.rows.length;
-    // if (len == 0){
-      // return fn(null, null);
-    // }
-    // else {  
-        // // var response = {"user" : result.rows[0]};
-        // var user = result.rows[0];
-        // console.log("GET username: " + result.rows[0].username);
-        // console.log("GET password: " + result.rows[0].upassword);
-        // client.end();
-        // return fn(null, user);
-//         
-       // }
-  // });
-// }
-//  
-// app.post('/login', function(request, response) {
-//  
-    // var username = request.body.username;
-    // var password = request.body.password;
-//  
-    // if(username == 'demo' && password == 'demo'){
-        // request.session.regenerate(function(){
-        // request.session.user = username;
-        // response.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
-        // });
-    // }
-    // else {
-       // response.redirect('/login');
-    // }    
-// });
-//  
-// app.get('/logout', function(request, response){
-    // request.session.destroy(function(){
-        // response.redirect('/');
-    // });
-// });
-//  
-// app.get('/', restrict, function(request, response){
-  // // response.send('This is the restricted area! Hello ' + request.session.user + '! click <a href="/logout">here to logout</a>');
-  // response.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
-//});
-
 var product = require("./product.js");
 var Product = product.Product;
 
@@ -289,6 +219,33 @@ app.get('/ProjectServer/currentUser', function(req, res) {
 		var response = {"user" : result.rows};
 		client.end();
   		res.json(response);
+ 	});
+});
+
+// REST Operation - HTTP GET to read a product based on its id
+app.get('/ProjectServer/currentProductSeller/:id', function(req, res) {
+	var id = req.params.id;
+	console.log("GET product: " + id);
+
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT * FROM customer NATURAL JOIN mailingaddress WHERE uid = $1", [id]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Current seller not found.");
+		}
+		else {	
+  			var response = {"seller" : result.rows[0]};
+			client.end();
+  			res.json(response);
+  		}
  	});
 });
 
@@ -392,27 +349,6 @@ app.get('/ProjectServer/bidderList/:id', function(req, res) {
  	// });
 // });
 
-
-// // REST Operation - HTTP GET to read all products
-// app.get('/ProjectServer/bidderList/:id', function(req, res) {
-	// var id = req.params.id;
-	// console.log("GET");
-// 	
-	// var client = new pg.Client(conString);
-	// client.connect();
-// 
-	// var query = client.query("SELECT username, userbidprice, userbidtime FROM bids NATURAL JOIN customer NATURAL JOIN auction WHERE pid = $1 ORDER BY userbidprice desc", id);
-// 	
-	// query.on("row", function (row, result) {
-    	// result.addRow(row);
-	// });
-	// query.on("end", function (result) {
-		// var response = {"bidderList" : result.rows};
-		// client.end();
-  		// res.json(response);
- 	// });
-// });
-
 // REST Operation - HTTP PUT to updated a product based on its id
 app.put('/ProjectServer/products/:id', function(req, res) {
 	var id = req.params.id;
@@ -513,14 +449,6 @@ app.post('/ProjectServer/products', function(req, res) {
 var usercopy = require("./user.js");
 var User = usercopy.User;
 
-var userList = new Array(
-	new User("christian.montes", "chris123", "Christian", "Montes", "calle Amazonas", "Ponce", "PR", "00728", "calle Amazonas", "Ponce", "PR", "00728", "7872315270", "chris.omar91@me.com" , 5)	
-);
- var userNextId = 0;
- 
-for (var i=0; i < userList.length;++i){
-	userList[i].id = userNextId++;
-}
 // REST Operations
 // Idea: Data is created, read, updated, or deleted through a URL that 
 // identifies the resource to be created, read, updated, or deleted.
