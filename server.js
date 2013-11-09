@@ -607,14 +607,6 @@ app.post('/ProjectServer/users', function(req, res) {
 var category = require("./category.js");
 var Category = category.Category;
 
-var categoryList = new Array(
-	new Category("phones")	
-);
- var categoryNextId = 0;
- 
-for (var i=0; i < categoryList.length;++i){
-	categoryList[i].id = categoryNextId++;
-}
 // REST Operations
 // Idea: Data is created, read, updated, or deleted through a URL that 
 // identifies the resource to be created, read, updated, or deleted.
@@ -633,7 +625,7 @@ for (var i=0; i < categoryList.length;++i){
 // });
 
 // REST Operation - HTTP GET to read all products from a category
-app.get('/ProjectServer/categories', function(req, res) {
+/*app.get('/ProjectServer/categories', function(req, res) {
 	console.log("GET categories");
 	
 	var client = new pg.Client(conString);
@@ -649,7 +641,7 @@ app.get('/ProjectServer/categories', function(req, res) {
 		client.end();
   		res.json(response);
  	});
-});
+});*/
 
 // REST Operation - HTTP GET to read a product based on its category
 app.get('/ProjectServer/categories/:category', function(req, res) {
@@ -659,8 +651,7 @@ app.get('/ProjectServer/categories/:category', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	// var query = client.query("SELECT * from product natural join category where category_name = $1", [category]);
-	var query = client.query("SELECT * from product natural join category where $1 = any (category_name)", [category]);
+	var query = client.query("SELECT * FROM product NATURAL JOIN hasCategory WHERE categoryname = $1", [category]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -669,10 +660,10 @@ app.get('/ProjectServer/categories/:category', function(req, res) {
 		var len = result.rows.length;
 		if (len == 0){
 			res.statusCode = 404;
-			res.send("Product not found.");
+			res.send("Category not found.");
 		}
 		else {	
-  			var response = {"categories" : result.rows};
+  			var response = {"category" : result.rows};
 			client.end();
   			res.json(response);
   		}
