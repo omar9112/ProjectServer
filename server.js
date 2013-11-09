@@ -280,7 +280,7 @@ app.get('/ProjectServer/currentUser', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT * from customer where uid = $1", [currentUser.uid]);
+	var query = client.query("SELECT * FROM customer NATURAL JOIN mailingaddress WHERE uid = $1", [currentUser.uid]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -366,31 +366,31 @@ app.get('/ProjectServer/bidderList/:id', function(req, res) {
 });
 
 // REST Operation - HTTP GET to read a product based on its id
-app.get('/ProjectServer/userAccount/:id', function(req, res) {
-	var id = req.params.id;
-	console.log("GET userAccount: " + id);
-
-	var client = new pg.Client(conString);
-	client.connect();
-
-	var query = client.query("SELECT fname, lname, streetma, statema, cityma, zipma, phonenumber, email FROM customer NATURAL JOIN mailingaddress WHERE uid = $1", [id]);
-	
-	query.on("row", function (row, result) {
-    	result.addRow(row);
-	});
-	query.on("end", function (result) {
-		var len = result.rows.length;
-		if (len == 0){
-			res.statusCode = 404;
-			res.send("List not found.");
-		}
-		else {	
-  			var response = {"userAccount" : result.rows};
-			client.end();
-  			res.json(response);
-  		}
- 	});
-});
+// app.get('/ProjectServer/userAccount/:id', function(req, res) {
+	// var id = req.params.id;
+	// console.log("GET userAccount: " + id);
+// 
+	// var client = new pg.Client(conString);
+	// client.connect();
+// 
+	// var query = client.query("SELECT fname, lname, streetma, statema, cityma, zipma, phonenumber, email FROM customer NATURAL JOIN mailingaddress WHERE uid = $1", [id]);
+// 	
+	// query.on("row", function (row, result) {
+    	// result.addRow(row);
+	// });
+	// query.on("end", function (result) {
+		// var len = result.rows.length;
+		// if (len == 0){
+			// res.statusCode = 404;
+			// res.send("List not found.");
+		// }
+		// else {	
+  			// var response = {"userAccount" : result.rows};
+			// client.end();
+  			// res.json(response);
+  		// }
+ 	// });
+// });
 
 
 // // REST Operation - HTTP GET to read all products
