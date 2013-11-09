@@ -232,7 +232,7 @@ app.get('/ProjectServer/currentUserCart', function(req, res) {
 
 	var query = client.query("SELECT product.pid, pname, pmodel, pbrand, pcondition, ppricemethod, pprice, pdescription" +
 							  "FROM (customer NATURAL JOIN shoppingcart), product " +
-							  "WHERE shoppingcart.pid = product.pid" +
+							  "WHERE shoppingcart.pid = product.pid " +
 							  		"AND customer.uid = $1", [currentUser.uid]);
 	
 	query.on("row", function (row, result) {
@@ -253,7 +253,9 @@ app.get('/ProjectServer/currentProductSeller/:id', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT * FROM customer NATURAL JOIN mailingaddress WHERE uid = $1", [id]);
+	var query = client.query("SELECT * " +
+							 "FROM customer NATURAL JOIN mailingaddress " +
+							 "WHERE uid = $1", [id]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -279,7 +281,8 @@ app.get('/ProjectServer/products', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT * from product");
+	var query = client.query("SELECT * " +
+							 "FROM product");
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -299,7 +302,9 @@ app.get('/ProjectServer/products/:id', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT * from product where pid = $1", [id]);
+	var query = client.query("SELECT * " +
+							 "FROM product " +
+							 "WHERE pid = $1", [id]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -326,7 +331,10 @@ app.get('/ProjectServer/bidderList/:id', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT username, userbidprice, userbidtime FROM bids NATURAL JOIN customer NATURAL JOIN auction WHERE pid = $1 ORDER BY userbidprice desc", [id]);
+	var query = client.query("SELECT username, userbidprice, userbidtime " +
+							 "FROM bids NATURAL JOIN customer NATURAL JOIN auction " +
+							 "WHERE pid = $1 " +
+							 "ORDER BY userbidprice desc", [id]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -344,33 +352,6 @@ app.get('/ProjectServer/bidderList/:id', function(req, res) {
   		}
  	});
 });
-
-// REST Operation - HTTP GET to read a product based on its id
-// app.get('/ProjectServer/userAccount/:id', function(req, res) {
-	// var id = req.params.id;
-	// console.log("GET userAccount: " + id);
-// 
-	// var client = new pg.Client(conString);
-	// client.connect();
-// 
-	// var query = client.query("SELECT fname, lname, streetma, statema, cityma, zipma, phonenumber, email FROM customer NATURAL JOIN mailingaddress WHERE uid = $1", [id]);
-// 	
-	// query.on("row", function (row, result) {
-    	// result.addRow(row);
-	// });
-	// query.on("end", function (result) {
-		// var len = result.rows.length;
-		// if (len == 0){
-			// res.statusCode = 404;
-			// res.send("List not found.");
-		// }
-		// else {	
-  			// var response = {"userAccount" : result.rows};
-			// client.end();
-  			// res.json(response);
-  		// }
- 	// });
-// });
 
 // REST Operation - HTTP PUT to updated a product based on its id
 app.put('/ProjectServer/products/:id', function(req, res) {
@@ -674,7 +655,9 @@ app.get('/ProjectServer/categories/:category', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT * FROM product NATURAL JOIN hasCategory WHERE categoryname = $1", [category]);
+	var query = client.query("SELECT * " +
+							 "FROM product NATURAL JOIN hasCategory " +
+							 "WHERE categoryname = $1", [category]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
