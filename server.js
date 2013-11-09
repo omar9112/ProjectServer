@@ -342,7 +342,8 @@ app.get('/ProjectServer/products/:id', function(req, res) {
 });
 
 // REST Operation - HTTP GET to read all products
-app.get('/ProjectServer/bidderList/:pid', function(req, res) {
+app.get('/ProjectServer/bidderList/:id', function(req, res) {
+	var pid = req.params.pid;
 	console.log("GET");
 	
 	var client = new pg.Client(conString);
