@@ -343,13 +343,13 @@ app.get('/ProjectServer/products/:id', function(req, res) {
 
 // REST Operation - HTTP GET to read all products
 app.get('/ProjectServer/bidderList/:id', function(req, res) {
-	var pid = req.params.pid;
+	var id = req.params.id;
 	console.log("GET");
 	
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT username, userbidprice, userbidtime FROM bids NATURAL JOIN customer NATURAL JOIN auction WHERE pid = $1 ORDER BY userbidprice desc", pid);
+	var query = client.query("SELECT username, userbidprice, userbidtime FROM bids NATURAL JOIN customer NATURAL JOIN auction WHERE pid = $1 ORDER BY userbidprice desc", id);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
