@@ -277,13 +277,13 @@ var Product = product.Product;
 // d) DELETE - Remove an individual object, or collection (Database delete operation)
 
 // REST Operation - HTTP GET to read all products
-app.get('/ProjectServer/:currentUser', function(req, res) {
+app.get('/ProjectServer/currentUser', function(req, res) {
 	console.log("GET");
 	
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT * from customer where uid = $1", [currentUser.uid]);
+	var query = client.query("SELECT * from customer where uid = $1", [currentUsers.uid]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
