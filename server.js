@@ -341,6 +341,24 @@ app.get('/ProjectServer/products/:id', function(req, res) {
  	});
 });
 
+// REST Operation - HTTP GET to read all products
+app.get('/ProjectServer/bidderList/:pid', function(req, res) {
+	console.log("GET");
+	
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT username, userbidprice, userbidtime FROM bids NATURAL JOIN customer NATURAL JOIN auction WHERE pid = $1 ORDER BY userbidprice desc", pid);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var response = {"bidderList" : result.rows};
+		client.end();
+  		res.json(response);
+ 	});
+});
 
 // REST Operation - HTTP PUT to updated a product based on its id
 app.put('/ProjectServer/products/:id', function(req, res) {
