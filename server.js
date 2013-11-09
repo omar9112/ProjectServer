@@ -373,9 +373,7 @@ app.get('/ProjectServer/userAccount/:id', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT fname, lname, streetma, statema, cityma, zipma, phonenumber, email
-							FROM customer NATURAL JOIN mailingaddress
-							WHERE uid = $1", [id]);
+	var query = client.query("SELECT fname, lname, streetma, statema, cityma, zipma, phonenumber, email FROM customer NATURAL JOIN mailingaddress WHERE uid = $1", [id]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
