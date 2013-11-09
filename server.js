@@ -230,7 +230,7 @@ app.get('/ProjectServer/currentUserCart', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT product.pid, pname, pmodel, pbrand, pcondition, ppricemethod, pprice, pdescription" +
+	var query = client.query("SELECT product.pid, pname, pmodel, pbrand, pcondition, ppricemethod, pprice, pdescription " +
 							  "FROM (customer NATURAL JOIN shoppingcart), product " +
 							  "WHERE shoppingcart.pid = product.pid " +
 							  		"AND customer.uid = $1", [currentUser.uid]);
