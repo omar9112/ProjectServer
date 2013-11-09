@@ -338,25 +338,6 @@ app.get('/ProjectServer/products/:id', function(req, res) {
  	});
 });
 
-// // REST Operation - HTTP GET to read all products
-// app.get('/ProjectServer/bidderList', function(req, res) {
-	// console.log("GET");
-// 	
-	// var client = new pg.Client(conString);
-	// client.connect();
-// 
-	// var query = client.query("SELECT username, userbidprice, userbidtime FROM bids NATURAL JOIN customer NATURAL JOIN auction ORDER BY userbidprice desc");
-// 	
-	// query.on("row", function (row, result) {
-    	// result.addRow(row);
-	// });
-	// query.on("end", function (result) {
-		// var response = {"biddersList" : result.rows};
-		// client.end();
-  		// res.json(response);
- 	// });
-// });
-
 // REST Operation - HTTP GET to read a product based on its id
 app.get('/ProjectServer/bidderList/:id', function(req, res) {
 	var id = req.params.id;
@@ -383,6 +364,36 @@ app.get('/ProjectServer/bidderList/:id', function(req, res) {
   		}
  	});
 });
+
+// REST Operation - HTTP GET to read a product based on its id
+app.get('/ProjectServer/userAccount/:id', function(req, res) {
+	var id = req.params.id;
+	console.log("GET userAccount: " + id);
+
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT fname, lname, streetma, statema, cityma, zipma, phonenumber, email
+							FROM customer NATURAL JOIN mailingaddress
+							WHERE uid = $1", [id]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("List not found.");
+		}
+		else {	
+  			var response = {"userAccount" : result.rows};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
+
 
 // // REST Operation - HTTP GET to read all products
 // app.get('/ProjectServer/bidderList/:id', function(req, res) {
