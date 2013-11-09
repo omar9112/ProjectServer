@@ -368,7 +368,7 @@ app.get('/ProjectServer/bidderList/:id', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT username, userbidprice, userbidtime FROM bids NATURAL JOIN customer NATURAL JOIN auction WHERE pid = $1 ORDER BY userbidprice desc", id);
+	var query = client.query("SELECT username, userbidprice, userbidtime FROM bids NATURAL JOIN customer NATURAL JOIN auction WHERE pid = $1 ORDER BY userbidprice desc", [id]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
