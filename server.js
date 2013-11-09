@@ -210,7 +210,9 @@ app.get('/ProjectServer/currentUser', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT * FROM customer NATURAL JOIN mailingaddress NATURAL JOIN phonenumber WHERE uid = $1", [currentUser.uid]);
+	var query = client.query("SELECT * " +
+							 "FROM customer NATURAL JOIN mailingaddress NATURAL JOIN phonenumber " +
+							 "WHERE uid = $1", [currentUser.uid]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -228,10 +230,10 @@ app.get('/ProjectServer/currentUserCart', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT product.pid, pname, pmodel, pbrand, pcondition, ppricemethod, pprice, pdescription
-							  FROM (customer NATURAL JOIN shoppingcart), product 
-							  WHERE shoppingcart.pid = product.pid
-							  		AND customer.uid = $1", [currentUser.uid]);
+	var query = client.query("SELECT product.pid, pname, pmodel, pbrand, pcondition, ppricemethod, pprice, pdescription" +
+							  "FROM (customer NATURAL JOIN shoppingcart), product " +
+							  "WHERE shoppingcart.pid = product.pid" +
+							  		"AND customer.uid = $1", [currentUser.uid]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
