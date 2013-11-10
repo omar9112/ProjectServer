@@ -145,16 +145,18 @@ app.configure(function() {
 });
 
 app.get('/', ensureAuthenticated, function(req, res){
-  res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
+  // res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
+  res.redirect('http://joevirella.brinkster.net/');
 });
 
-app.get('/account', ensureAuthenticated, function(req, res){
-  res.render('account', { user: req.user });
-
-});
+// app.get('/account', ensureAuthenticated, function(req, res){
+  // res.render('account', { user: req.user });
+// 
+// });
 
 app.get('/login', function(req, res){
 	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/login.html');
+	res.redirect('http://joevirella.brinkster.net/login.html');
 });
 
 // POST /login
@@ -167,7 +169,8 @@ app.get('/login', function(req, res){
 app.post('/login', 
   passport.authenticate('local', { failureRedirect: '/login', failureFlash: true }),
   function(req, res) {
-  	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
+  	// res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
+  	res.redirect('http://joevirella.brinkster.net/');
   });
 
 app.get('/logout', function(req, res){
@@ -282,7 +285,7 @@ app.get('/ProjectServer/products', function(req, res) {
 	client.connect();
 
 	var query = client.query("SELECT * " +
-							 "FROM product NATURAL JOIN auction NATURAL LEFT JOIN " +
+							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
 							 "GROUP BY auctionid) as A");
