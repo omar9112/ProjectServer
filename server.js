@@ -313,7 +313,7 @@ app.get('/ProjectServer/products/:id', function(req, res) {
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
 							 "GROUP BY auctionid) as A " +
-							 "WHERE pid = $1", [id]);
+							 "WHERE pid = $1 ", [id]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
