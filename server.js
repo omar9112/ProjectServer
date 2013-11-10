@@ -156,7 +156,7 @@ app.get('/', ensureAuthenticated, function(req, res){
 
 app.get('/login', function(req, res){
 	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/login.html');
-	res.redirect('http://joevirella.brinkster.net/login.html');
+	// res.redirect('http://joevirella.brinkster.net/login.html');
 });
 
 // POST /login
@@ -169,8 +169,8 @@ app.get('/login', function(req, res){
 app.post('/login', 
   passport.authenticate('local', { failureRedirect: '/login', failureFlash: true }),
   function(req, res) {
-  	// res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
-  	res.redirect('http://joevirella.brinkster.net/');
+  	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
+  	// res.redirect('http://joevirella.brinkster.net/');
   });
 
 app.get('/logout', function(req, res){
@@ -692,7 +692,7 @@ app.get('/ProjectServer/orderCategoryBy/:category/:orderType', function(req, res
 	var query = client.query("SELECT * " +
 							 "FROM product NATURAL JOIN hasCategory " +
 							 "WHERE categoryname = $1 " +
-							 "ORDER BY $2 ", [category, orderType]);
+							 "ORDER BY pname ", [category]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
