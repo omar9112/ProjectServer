@@ -685,6 +685,7 @@ app.get('/ProjectServer/categories/:category', function(req, res) {
 app.get('/ProjectServer/orderCategoryBy/:category/:orderType', function(req, res) {
 	var category = req.params.category;
 	var orderType = req.params.orderType;
+	alert(orderType);
 	console.log("GET product from: " + orderType);
 
 	var client = new pg.Client(conString);
