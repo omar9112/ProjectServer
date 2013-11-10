@@ -307,9 +307,12 @@ app.get('/ProjectServer/products/:id', function(req, res) {
 
 	var client = new pg.Client(conString);
 	client.connect();
-
+	
 	var query = client.query("SELECT * " +
-							 "FROM product " +
+							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
+							 "(SELECT auctionid, count(auctionid) as numberofbids " +
+							 "FROM auction NATURAL JOIN bids " + 
+							 "GROUP BY auctionid) as A " +
 							 "WHERE pid = $1", [id]);
 	
 	query.on("row", function (row, result) {
@@ -626,32 +629,6 @@ var Category = category.Category;
 // b) GET - Read an individual object, collection of object, or simple values (Database read Operation)
 // c) PUT - Update an individual object, or collection  (Database update operation)
 // d) DELETE - Remove an individual object, or collection (Database delete operation)
-
-// // REST Operation - HTTP GET to read all categories
-// app.get('/ProjectServer/categories', function(req, res) {
-	// console.log("GET categories");
-	// var response = {"categories" : categoryList};
-  	// res.json(response);
-// });
-
-// REST Operation - HTTP GET to read all products from a category
-/*app.get('/ProjectServer/categories', function(req, res) {
-	console.log("GET categories");
-	
-	var client = new pg.Client(conString);
-	client.connect();
-
-	var query = client.query("SELECT * from category");
-	
-	query.on("row", function (row, result) {
-    	result.addRow(row);
-	});
-	query.on("end", function (result) {
-		var response = {"categories" : result.rows};
-		client.end();
-  		res.json(response);
- 	});
-});*/
 
 // REST Operation - HTTP GET to read a product based on its category
 app.get('/ProjectServer/categories/:category', function(req, res) {
