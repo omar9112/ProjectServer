@@ -683,6 +683,7 @@ app.get('/ProjectServer/categories/:category', function(req, res) {
 });
 
 app.get('/ProjectServer/orderCategoryBy/:category/:orderType', function(req, res) {
+	var category = req.params.category;
 	var orderType = req.params.orderType;
 	console.log("GET product from: " + orderType);
 
@@ -692,7 +693,7 @@ app.get('/ProjectServer/orderCategoryBy/:category/:orderType', function(req, res
 	var query = client.query("SELECT * " +
 							 "FROM product NATURAL JOIN hasCategory " +
 							 "WHERE categoryname = $1 " +
-							 "ORDER BY pname ", [category]);
+							 "ORDER BY $2 ", [category, orderType]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
