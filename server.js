@@ -282,7 +282,10 @@ app.get('/ProjectServer/products', function(req, res) {
 	client.connect();
 
 	var query = client.query("SELECT * " +
-							 "FROM product");
+							 "FROM product NATURAL JOIN auction NATURAL LEFT JOIN " +
+							 "(SELECT auctionid, count(auctionid) as numberofbids " +
+							 "FROM auction NATURAL JOIN bids " + 
+							 "GROUP BY auctionid) as A" + ");
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -685,8 +688,8 @@ app.get('/ProjectServer/orderCategoryBy/:category/:orderType', function(req, res
 
 	var query = client.query("SELECT * " +
 							 "FROM product NATURAL JOIN hasCategory " +
-							 "WHERE categoryname = $1" +
-							 "ORDER BY $2", [category, orderType]);
+							 "WHERE categoryname = $1 " +
+							 "ORDER BY $2 ", [category, orderType]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
