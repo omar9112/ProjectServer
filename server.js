@@ -676,6 +676,35 @@ app.get('/ProjectServer/categories/:category', function(req, res) {
  	});
 });
 
+app.get('/ProjectServer/orderCategoryBy/:category/:orderType', function(req, res) {
+	var orderType = req.params.orderType;
+	console.log("GET product from: " + orderType);
+
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT * " +
+							 "FROM product NATURAL JOIN hasCategory " +
+							 "WHERE categoryname = $1" +
+							 "ORDER BY $2", [category, orderType]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Category not found.");
+		}
+		else {	
+  			var response = {"orderType" : result.rows};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
+
 // Server starts running when listen is called.
 app.listen(process.env.PORT || 3412);
 console.log("server listening");
