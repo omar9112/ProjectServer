@@ -40,15 +40,13 @@ function findById(id, fn) {
   query.on("end", function (result) {
     var len = result.rows.length;
     if (len == 0){
-      // res.statusCode = 404;
-      // res.send("User not found.");
-      //return fn(null, null);
       fn(new Error('User ' + id + ' does not exist'));
     }
     else {  
         // var response = {"user" : result.rows[0]};
         // currentUser = result.rows[0];
         var user = result.rows[0];
+        currentUser = result.rows[0];
         console.log("GET username by Id: " + result.rows[0].username);
         console.log("GET password by Id: " + result.rows[0].upassword);
         client.end();
