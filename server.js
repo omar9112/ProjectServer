@@ -736,7 +736,7 @@ app.get('/ProjectServer/orderCategoryBy/:category/:orderType', function(req, res
  	});
 });
 
-app.get('/ProjectServer/orderSearchPage/:orderType/', function(req, res) {
+app.get('/ProjectServer/orderSearchPage/:orderType', function(req, res) {
 	var orderType = req.params.orderType;
 	console.log("GET product from: " + orderType);
 
