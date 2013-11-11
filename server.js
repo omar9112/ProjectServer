@@ -288,7 +288,7 @@ app.get('/ProjectServer/products', function(req, res) {
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
-							 "GROUP BY auctionid) as A" +
+							 "GROUP BY auctionid) as A " +
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
 			        							"FROM auction))");
@@ -315,7 +315,7 @@ app.get('/ProjectServer/products/:id', function(req, res) {
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
-							 "GROUP BY auctionid) as A" +
+							 "GROUP BY auctionid) as A " +
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
 			        							"FROM auction))" +
