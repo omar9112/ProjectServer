@@ -619,6 +619,34 @@ app.post('/ProjectServer/users', function(req, res) {
   	res.json(true);
 });
 
+// REST Operation - HTTP GET to read all products
+app.get('/ProjectServer/itemsforsale/:id', function(req, res) {
+	var id = req.params.id;
+	console.log("GET");
+	
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT * " +
+							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
+							 "(SELECT auctionid, count(auctionid) as numberofbids " +
+							 "FROM auction NATURAL JOIN bids " + 
+							 "GROUP BY auctionid) as A " +
+							 "WHERE pid in (select pid " +
+	      					 	"FROM sale UNION (select pid " +
+			        							"FROM auction))" +
+			        			"AND uid = $1", id);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var response = {"itemsForSale" : result.rows};
+		client.end();
+  		res.json(response);
+ 	});
+});
+
 /*
  * ################################## CATEGORY ##################################
  */
