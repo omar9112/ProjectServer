@@ -644,7 +644,7 @@ app.get('/ProjectServer/categories/:category', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 	
-	var query = client.query("SELECT * " +
+	var query = client.query("SELECT *, to_char(penddate, 'HH12:MI:SS') " +
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
