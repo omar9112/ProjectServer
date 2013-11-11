@@ -647,6 +647,28 @@ app.get('/ProjectServer/itemsforsale/:id', function(req, res) {
  	});
 });
 
+
+app.get('/ProjectServer/saleHistory/:id', function(req, res) {
+	var id = req.params.id;
+	console.log("GET");
+	
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT * " +
+							 "FROM customerorder NATURAL JOIN product " +
+			        		 "WHERE sellerid = $1", [id]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var response = {"saleHistory" : result.rows};
+		client.end();
+  		res.json(response);
+ 	});
+});
+
 /*
  * ################################## CATEGORY ##################################
  */
@@ -722,6 +744,39 @@ app.get('/ProjectServer/reportList/:reportDate', function(req, res) {
 		}
 		else {	
   			var response = {"reportList" : result.rows};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
+
+app.get('/ProjectServer/recentFeedback/:id', function(req, res) {
+	var id = req.params.id;
+	console.log("GET product from: " + id);
+
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	var query = client.query("SELECT reviewGiven.reviewid, reviewGiven.uid as uidr, customer.fname as fnameR, customer.lname as lnameR, customer.username as usernamer, reviewGiven.uidg, reviewGiven.fnameG, reviewGiven.lnameG, reviewGiven.usernameg, reviewGiven.subject, reviewGiven.feedback, reviewGiven.rating, reviewGiven.ratedate " +
+							 "FROM " +
+							 "(select review.reviewid, customer.fname as fnameG, customer.lname as lnameG, customer.username as usernameg, review.subject, review.feedback, review.rating, review.uid as uid, review.reviewgivenby as uidG, review.ratedate " +
+							 "from customer, review " + 
+							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory " +
+							 "where customer.uid = review.reviewgivenby) as reviewGiven " +
+	      					 "join customer using(uid) " +
+			        							"where reviewGiven.uid = $1", [id]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Category not found.");
+		}
+		else {	
+  			var response = {"feedbackList" : result.rows};
 			client.end();
   			res.json(response);
   		}
