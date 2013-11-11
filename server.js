@@ -388,7 +388,7 @@ app.get('/ProjectServer/saleHistory/:id', function(req, res) {
 			res.send("Product not found.");
 		}
 		else {	
-  			var response = {"saleHistory" : result.rows[0]};
+  			var response = {"saleHistory" : result.rows};
 			client.end();
   			res.json(response);
   		}
