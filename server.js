@@ -213,7 +213,7 @@ app.get('/ProjectServer/currentUser', function(req, res) {
 
 	var query = client.query("SELECT * " +
 							 "FROM customer NATURAL JOIN mailingaddress NATURAL JOIN phonenumber " +
-							 "WHERE uid = $1", [currentUser.uid]);
+							 "WHERE uid = $1", [req.user.uid]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
