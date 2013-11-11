@@ -288,7 +288,10 @@ app.get('/ProjectServer/products', function(req, res) {
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
-							 "GROUP BY auctionid) as A");
+							 "GROUP BY auctionid) as A" +
+							 "WHERE pid in (select pid " +
+	      					 	"FROM sale UNION (select pid " +
+			        							"FROM auction))");
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -312,8 +315,11 @@ app.get('/ProjectServer/products/:id', function(req, res) {
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
-							 "GROUP BY auctionid) as A " +
-							 "WHERE pid = $1 ", [id]);
+							 "GROUP BY auctionid) as A" +
+							 "WHERE pid in (select pid " +
+	      					 	"FROM sale UNION (select pid " +
+			        							"FROM auction))" +
+			        							"AND pid = $1 ", [id]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -637,6 +643,15 @@ app.get('/ProjectServer/categories/:category', function(req, res) {
 
 	var client = new pg.Client(conString);
 	client.connect();
+	
+	var query = client.query("SELECT * " +
+							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
+							 "(SELECT auctionid, count(auctionid) as numberofbids " +
+							 "FROM auction NATURAL JOIN bids " + 
+							 "GROUP BY auctionid) as A" +
+							 "WHERE pid in (select pid " +
+	      					 	"FROM sale UNION (select pid " +
+			        							"FROM auction))");
 
 	var query = client.query("SELECT * " +
 							 "FROM product NATURAL JOIN hasCategory " +
@@ -659,6 +674,35 @@ app.get('/ProjectServer/categories/:category', function(req, res) {
  	});
 });
 
+// REST Operation - HTTP GET to read a product based on its category
+app.get('/ProjectServer/reportList/:reportDate', function(req, res) {
+	var reportDate = req.params.reportDate;
+	console.log("GET product from: " + reportDate);
+
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	var query = client.query("SELECT * " +
+							 "FROM customerorder JOIN product USING(pid) " +
+							 "WHERE orderdate = $1 ", [reportDate]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("report date not found.");
+		}
+		else {	
+  			var response = {"reportList" : result.rows};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
+
 app.get('/ProjectServer/orderCategoryBy/:category/:orderType', function(req, res) {
 	var category = req.params.category;
 	var orderType = req.params.orderType;
@@ -666,11 +710,50 @@ app.get('/ProjectServer/orderCategoryBy/:category/:orderType', function(req, res
 
 	var client = new pg.Client(conString);
 	client.connect();
+	
+	var query = client.query("SELECT *, GREATEST(pprice, currentbidprice) AS price " +
+							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
+							 "(SELECT auctionid, count(auctionid) AS numberofbids " +
+							 "FROM auction NATURAL JOIN bids " + 
+							 "GROUP BY auctionid) as A " +
+							 "ORDER BY " +  ordertype);
 
 	var query = client.query("SELECT * " +
 							 "FROM product NATURAL JOIN hasCategory " +
 							 "WHERE categoryname = $1 " +
 							 "ORDER BY " + orderType, [category]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Category not found.");
+		}
+		else {	
+  			var response = {"orderType" : result.rows};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
+
+app.get('/ProjectServer/orderSearchPage/:orderType/', function(req, res) {
+	var category = req.params.category;
+	var orderType = req.params.orderType;
+	console.log("GET product from: " + orderType);
+
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT *, GREATEST(pprice, currentbidprice) AS price " +
+							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
+							 "(SELECT auctionid, count(auctionid) AS numberofbids " +
+							 "FROM auction NATURAL JOIN bids " + 
+							 "GROUP BY auctionid) as A " +
+							 "ORDER BY " +  ordertype);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
