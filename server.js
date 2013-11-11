@@ -697,6 +697,34 @@ app.get('/ProjectServer/saleHistory/:id', function(req, res) {
  	});
 });
 
+// app.get('/ProjectServer/saleHistory/:id', function(req, res) {
+	// var id = req.params.id;
+	// console.log("GET product: " + id);
+// 
+	// var client = new pg.Client(conString);
+	// client.connect();
+// 	
+	// var query = client.query("SELECT * " +
+							 // "FROM product NATURAL JOIN customerorder " +
+							 // "WHERE sellerid = $1 ", [id]);
+// 	
+	// query.on("row", function (row, result) {
+    	// result.addRow(row);
+	// });
+	// query.on("end", function (result) {
+		// var len = result.rows.length;
+		// if (len == 0){
+			// res.statusCode = 404;
+			// res.send("Product not found.");
+		// }
+		// else {	
+  			// var response = {"saleHistory" : result.rows[0]};
+			// client.end();
+  			// res.json(response);
+  		// }
+ 	// });
+// });
+
 /*
  * ################################## CATEGORY ##################################
  */
