@@ -635,7 +635,7 @@ app.get('/ProjectServer/itemsforsale/:id', function(req, res) {
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
 			        							"FROM auction))" +
-			        			"AND uid = $1", id);
+			        			"AND uid = $1", [id]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
