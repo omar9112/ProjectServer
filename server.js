@@ -761,7 +761,6 @@ app.get('/ProjectServer/recentFeedback/:id', function(req, res) {
 							 "FROM " +
 							 "(select review.reviewid, customer.fname as fnameG, customer.lname as lnameG, customer.username as usernameg, review.subject, review.feedback, review.rating, review.uid as uid, review.reviewgivenby as uidG, review.ratedate " +
 							 "from customer, review " + 
-							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory " +
 							 "where customer.uid = review.reviewgivenby) as reviewGiven " +
 	      					 "join customer using(uid) " +
 			        							"where reviewGiven.uid = $1", [id]);
