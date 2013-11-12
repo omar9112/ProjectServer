@@ -143,8 +143,8 @@ app.configure(function() {
 });
 
 app.get('/', ensureAuthenticated, function(req, res){
-  // res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
-  res.redirect('http://joevirella.brinkster.net/');
+  res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
+  // res.redirect('http://joevirella.brinkster.net/');
 });
 
 // app.get('/account', ensureAuthenticated, function(req, res){
