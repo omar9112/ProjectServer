@@ -309,11 +309,11 @@ app.get('/ProjectServer/products/:id', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 	
-	var query = client.query("SELECT * " +
+	var query = client.query("SELECT DISTINCT ON (pid) * " +
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
-							 "GROUP BY auctionid) as A " +
+							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory " +
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
 			        							"FROM auction))" +
