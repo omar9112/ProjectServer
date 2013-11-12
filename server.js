@@ -395,7 +395,6 @@ app.get('/ProjectServer/saleHistory/:id', function(req, res) {
  	});
 });
 
-
 // REST Operation - HTTP PUT to updated a product based on its id
 app.put('/ProjectServer/products/:id', function(req, res) {
 	var id = req.params.id;
@@ -764,7 +763,7 @@ app.get('/ProjectServer/reportList/:reportDate', function(req, res) {
 	client.connect();
 	
 	var query = client.query("SELECT * " +
-							 "FROM customerorder JOIN product USING(pid) " +
+							 "FROM customerorder NATURAL JOIN product " +
 							 "WHERE orderdate = $1 ", [reportDate]);
 	
 	query.on("row", function (row, result) {
