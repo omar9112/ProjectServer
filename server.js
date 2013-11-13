@@ -175,7 +175,7 @@ app.post('/login',
   
   
   
-  app.get('/vit',function  (req,res,next) {
+  app.get('/currentUser',function  (req,res,next) {
     res.type('application/json');
     res.jsonp(req.user);  //items is the object
 });
