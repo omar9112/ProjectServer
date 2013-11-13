@@ -146,7 +146,7 @@ app.configure(function() {
 });
 
 app.get('/', ensureAuthenticated, function(req, res){
-  res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html#homePage');
+  res.redirect('http://kiwi-s.com/ICOM-5016/ProjectClient/index.html#homePage');
 });
 
 // app.get('/account', ensureAuthenticated, function(req, res){
@@ -155,7 +155,7 @@ app.get('/', ensureAuthenticated, function(req, res){
 // });
 
 app.get('/login', function(req, res){
-	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html#login');
+	res.redirect('http://kiwi-s.com/ICOM-5016/ProjectClient/index.html#login');
 });
 
 // POST /login
@@ -170,7 +170,7 @@ app.post('/login',
   function(req, res) {
   	res.type('application/json');
   	res.jsonp("Hola");
-  	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html#homePage');
+  	res.redirect('http://kiwi-s.com/ICOM-5016/ProjectClient/index.html#homePage');
   });
   
   
