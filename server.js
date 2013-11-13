@@ -32,7 +32,9 @@ app.configure(function () {
 function findById(id, fn) {
   var client = new pg.Client(conString);
   client.connect();
-  var query = client.query("SELECT * FROM customer where uid = $1", [id]);
+  var query = client.query("SELECT * " +
+							 "FROM customer NATURAL JOIN mailingaddress NATURAL JOIN phonenumber " +
+							 "WHERE uid = $1", [id]);
 
   query.on("row", function (row, result) {
       result.addRow(row);
@@ -61,7 +63,9 @@ function findByUsername(username, password, fn) {
   var client = new pg.Client(conString);
   client.connect();
 
-  var query = client.query("SELECT * FROM customer where username = $1 AND upassword = $2", [username, password]);
+  var query = client.query("SELECT * " +
+						   "FROM customer NATURAL JOIN mailingaddress NATURAL JOIN phonenumber " +
+						   "WHERE username = $1 AND upassword = $2 ", [username, password]);
 
   query.on("row", function (row, result) {
       result.addRow(row);
@@ -118,7 +122,6 @@ passport.use(new LocalStrategy(
       findByUsername(username, password, function(err, user) {
         if (err) { return done(err); }
         if (!user) { return done(null, false, { message: 'Unknown user ' + username }); }
-//         if (user.upassword != password) { return done(null, false, { message: 'Invalid password' }); }
         return done(null, user);
       });
     });
@@ -143,8 +146,7 @@ app.configure(function() {
 });
 
 app.get('/', ensureAuthenticated, function(req, res){
-  res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
-  // res.redirect('http://joevirella.brinkster.net/');
+  res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html#homePage');
 });
 
 // app.get('/account', ensureAuthenticated, function(req, res){
@@ -153,8 +155,7 @@ app.get('/', ensureAuthenticated, function(req, res){
 // });
 
 app.get('/login', function(req, res){
-	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/login.html');
-	// res.redirect('http://joevirella.brinkster.net/login.html');
+	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html#login');
 });
 
 // POST /login
@@ -167,9 +168,17 @@ app.get('/login', function(req, res){
 app.post('/login', 
   passport.authenticate('local', { failureRedirect: '/login', failureFlash: true }),
   function(req, res) {
-  	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html');
-  	// res.redirect('http://joevirella.brinkster.net/');
+  	res.type('application/json');
+  	res.jsonp("Hola");
+  	res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html#homePage');
   });
+  
+  
+  
+  app.get('/vit',function  (req,res,next) {
+    res.type('application/json');
+    res.jsonp(req.user);  //items is the object
+});
 
 app.get('/logout', function(req, res){
   req.logout();
@@ -225,7 +234,10 @@ app.get('/ProjectServer/currentUser', function(req, res) {
  	});
 });
 
-app.get('/ProjectServer/currentUserCart', function(req, res) {
+
+
+app.get('/ProjectServer/currentUserCart/:id', function(req, res) {
+	var id = req.params.id;
 	console.log("GET");
 	
 	var client = new pg.Client(conString);
@@ -234,7 +246,7 @@ app.get('/ProjectServer/currentUserCart', function(req, res) {
 	var query = client.query("SELECT product.pid, pname, pmodel, pbrand, pcondition, ppricemethod, pprice, pdescription " +
 							  "FROM (customer NATURAL JOIN shoppingcart), product " +
 							  "WHERE shoppingcart.pid = product.pid " +
-							  		"AND customer.uid = $1", [currentUser.uid]);
+							  		"AND customer.uid = $1", [id]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
