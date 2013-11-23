@@ -1,15 +1,10 @@
-// Express is the web framework
-var flash = require('connect-flash')
-  , express = require('express')
-  , passport = require('passport')
-  , util = require('util')
-  , LocalStrategy = require('passport-local').Strategy
-  , pg = require('pg').native;
-  
+// Express is the web framework 
+var express = require('express');
+var pg = require('pg').native;
 var app = express();
+  
+// Database connection string: pg://<username>:<password>@host:port/dbname 
 var conString = "pg://fjupgmyvemqepn:cubKJkYRU__l8azH1vtHXngBjJ@ec2-54-204-17-24.compute-1.amazonaws.com:5432/da7jluqsdd1u63";
-
-var currentUser = {};
 
 var allowCrossDomain = function(req, res, next) {
     res.header('Access-Control-Allow-Origin', '*');
@@ -29,180 +24,13 @@ app.configure(function () {
   app.use(allowCrossDomain);
 });
 
-function findById(id, fn) {
-  var client = new pg.Client(conString);
-  client.connect();
-  var query = client.query("SELECT * " +
-							 "FROM customer NATURAL JOIN mailingaddress NATURAL JOIN phonenumber " +
-							 "WHERE uid = $1", [id]);
-
-  query.on("row", function (row, result) {
-      result.addRow(row);
-  });
-  query.on("end", function (result) {
-    var len = result.rows.length;
-    if (len == 0){
-      fn(new Error('User ' + id + ' does not exist'));
-    }
-    else {  
-        // var response = {"user" : result.rows[0]};
-        // currentUser = result.rows[0];
-        var user = result.rows[0];
-        currentUser = result.rows[0];
-        console.log("GET username by Id: " + result.rows[0].username);
-        console.log("GET password by Id: " + result.rows[0].upassword);
-        client.end();
-         fn(null, result.rows[0]);
-        
-      }
-  });
-  
-}
-
-function findByUsername(username, password, fn) {
-  var client = new pg.Client(conString);
-  client.connect();
-
-  var query = client.query("SELECT * " +
-						   "FROM customer NATURAL JOIN mailingaddress NATURAL JOIN phonenumber " +
-						   "WHERE username = $1 AND upassword = $2 ", [username, password]);
-
-  query.on("row", function (row, result) {
-      result.addRow(row);
-  });
-  query.on("end", function (result) {
-    var len = result.rows.length;
-    if (len == 0){
-      return fn(null, null);
-    }
-    else {  
-        // var response = {"user" : result.rows[0]};
-        currentUser = result.rows[0];
-        var user = result.rows[0];
-        console.log("GET username: " + result.rows[0].username);
-        console.log("GET password: " + result.rows[0].upassword);
-        client.end();
-        return fn(null, user);
-        
-      }
-  });
-}
-
-
-// Passport session setup.
-//   To support persistent login sessions, Passport needs to be able to
-//   serialize users into and deserialize users out of the session.  Typically,
-//   this will be as simple as storing the user ID when serializing, and finding
-//   the user by ID when deserializing.
-passport.serializeUser(function(user, done) {
-  done(null, user.uid);
-});
-
-passport.deserializeUser(function(uid, done) {
-  findById(uid, function (err, user) {
-    done(err, user);
-  });
-});
-
-
-// Use the LocalStrategy within Passport.
-//   Strategies in passport require a `verify` function, which accept
-//   credentials (in this case, a username and password), and invoke a callback
-//   with a user object.  In the real world, this would query a database;
-//   however, in this example we are using a baked-in set of users.
-passport.use(new LocalStrategy(
-  function(username, password, done) {
-    // asynchronous verification, for effect...
-    process.nextTick(function () {
-      
-      // Find the user by username.  If there is no user with the given
-      // username, or the password is not correct, set the user to `false` to
-      // indicate failure and set a flash message.  Otherwise, return the
-      // authenticated `user`.
-      findByUsername(username, password, function(err, user) {
-        if (err) { return done(err); }
-        if (!user) { return done(null, false, { message: 'Unknown user ' + username }); }
-        return done(null, user);
-      });
-    });
-  }
-));
-
-
 // configure Express
 app.configure(function() {
-  app.use(express.logger());
-  app.use(express.cookieParser('shhhh, very secret'));
   app.use(express.bodyParser());
-  app.use(express.methodOverride());
-  app.use(express.session({ secret: 'keyboard cat' }));
-  // Initialize Passport!  Also use passport.session() middleware, to support
-  // persistent login sessions (recommended).
-  app.use(flash());
-  app.use(passport.initialize());
-  app.use(passport.session());
-  app.use(app.router);
-  app.use(express.static(__dirname + '/../../public'));
 });
-
-app.get('/', ensureAuthenticated, function(req, res){
-	res.redirect('http://kiwi-s.com/index.html#homePage');
-  // res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html#homePage');
-});
-
-// app.get('/account', ensureAuthenticated, function(req, res){
-  // res.render('account', { user: req.user });
-// 
-// });
-
-app.get('/login', function(req, res){
-	res.redirect('http://kiwi-s.com/index.html#login');
-	// res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html#login');
-});
-
-// POST /login
-//   Use passport.authenticate() as route middleware to authenticate the
-//   request.  If authentication fails, the user will be redirected back to the
-//   login page.  Otherwise, the primary route function function will be called,
-//   which, in this example, will redirect the user to the home page.
-//
-//   curl -v -d "username=bob&password=secret" http://127.0.0.1:3000/login
-app.post('/login', 
-  passport.authenticate('local', { failureRedirect: '/login', failureFlash: true }),
-  function(req, res) {
-  	res.type('application/json');
-  	res.redirect('http://kiwi-s.com/index.html#homePage');
-  	// res.redirect('http://127.0.0.1:8020/ICOM-5016/ProjectClient/index.html#homePage');
-  });
-  
-  
-  
-  app.get('/currentUser',function  (req,res,next) {
-    res.type('application/json');
-    res.jsonp(req.user);  //items is the object
-});
-
-app.get('/logout', function(req, res){
-  req.logout();
-  res.redirect('/');
-});
-
-// Simple route middleware to ensure user is authenticated.
-//   Use this route middleware on any resource that needs to be protected.  If
-//   the request is authenticated (typically via a persistent login session),
-//   the request will proceed.  Otherwise, the user will be redirected to the
-//   login page.
-function ensureAuthenticated(req, res, next) {
-  if (req.isAuthenticated()) { return next(); }
-  res.redirect('/login');
-}
 
 var product = require("./product.js");
 var Product = product.Product;
-
-// Database connection string: pg://<username>:<password>@host:port/dbname 
-// var conString = "pg://omar91:000569@localhost:5432/kiwidb";
-// var conString = "pg://fjupgmyvemqepn:cubKJkYRU__l8azH1vtHXngBjJ@ec2-54-204-17-24.compute-1.amazonaws.com:5432/da7jluqsdd1u63";
 
 
 // REST Operations
@@ -216,23 +44,46 @@ var Product = product.Product;
 // d) DELETE - Remove an individual object, or collection (Database delete operation)
 
 // REST Operation - HTTP GET to read all products
-app.get('/ProjectServer/currentUser', function(req, res) {
-	console.log("GET");
+app.get('/ProjectServer/currentUser/:uid', function(req, res) {
+	var uid = req.params.uid;
 	
 	var client = new pg.Client(conString);
 	client.connect();
-
+							 
 	var query = client.query("SELECT * " +
-							 "FROM customer NATURAL JOIN mailingaddress NATURAL JOIN phonenumber " +
-							 "WHERE uid = $1", [currentUser.uid]);
+	"FROM " +
+	"(SELECT COUNT(pid) AS buying, buyerid AS uid " +
+	 "FROM product NATURAL JOIN customerorder " +
+	 "GROUP BY buyerid) as itembuying " +
+	 "NATURAL RIGHT JOIN customer natural join mailingaddress natural join phonenumber " +
+	"natural left join " +
+	 "(select sellerid as uid, count(sellerid) as itemSelling " +
+"from product natural left join auction natural left join " +
+"(select auctionid, count(auctionid) as numberofbids " +
+"from auction natural join  bids " +
+"group by auctionid) as A " +
+"where pid in (select pid " +
+	      "from sale union (select pid " +
+			        "from auction)) " +
+			        "group by sellerid) as selling natural join (select uid, count (pid) as itemsincart " +
+"from customer natural left join shoppingcart " +
+"group by uid) as ShoppingCart " +
+							 "WHERE uid = $1", [uid]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
 	});
 	query.on("end", function (result) {
-		var response = {"user" : result.rows};
-		client.end();
-  		res.json(response);
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("User not found.");
+		}
+		else {	
+  			var response = {"currentUser" : result.rows[0]};
+			client.end();
+  			res.json(response);
+  		}
  	});
 });
 
@@ -257,6 +108,37 @@ app.get('/ProjectServer/currentUserCart/:id', function(req, res) {
 		var response = {"shoppingcart" : result.rows};
 		client.end();
   		res.json(response);
+ 	});
+});
+
+// REST Operation - HTTP GET to read a product based on its id
+app.get('/ProjectServer/user/:username/:password', function(req, res) {
+	var username = req.params.username;
+	var password = req.params.password;
+
+	console.log("GET user: " + username + ", " + password);
+
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT uid " +
+							 "FROM customer " +
+							 "WHERE username = $1 AND upassword = $2", [username, password]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("User not found.");
+		}
+		else {	
+  			var response = {"user" : result.rows[0]};
+			client.end();
+  			res.json(response);
+  		}
  	});
 });
 
