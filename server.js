@@ -50,24 +50,43 @@ app.get('/ProjectServer/currentUser/:uid', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 							 
-	var query = client.query("SELECT * " +
-	"FROM " +
-	"(SELECT COUNT(pid) AS buying, buyerid AS uid " +
-	 "FROM product NATURAL JOIN customerorder " +
-	 "GROUP BY buyerid) as itembuying " +
-	 "NATURAL RIGHT JOIN customer natural join mailingaddress natural join phonenumber " +
-	"natural left join " +
-	 "(select sellerid as uid, count(sellerid) as itemSelling " +
-"from product natural left join auction natural left join " +
-"(select auctionid, count(auctionid) as numberofbids " +
-"from auction natural join  bids " +
-"group by auctionid) as A " +
-"where pid in (select pid " +
-	      "from sale union (select pid " +
-			        "from auction)) " +
-			        "group by sellerid) as selling natural join (select uid, count (pid) as itemsincart " +
-"from customer natural left join shoppingcart " +
-"group by uid) as ShoppingCart " +
+	var query = client.query("SELECT uid, username, upassword, fname, lname, email, " +
+									"COALESCE(totalreviews, 0) as totalreviews, COALESCE(review.rating, 0) as rating, " +
+									"COALESCE(positive, 0) as positive, COALESCE(neutral, 0) as neutral, COALESCE(negative, 0) as negative," +
+									"COALESCE(rdescribed, 0) as rdescribed, COALESCE(rcommunication, 0) as rcommunication, " + 
+									"COALESCE(rstime, 0) as rstime, COALESCE(rscharges, 0) as rscharges, " +
+									"COALESCE(tdescribed, 0) as tdescribed, COALESCE(tcommunication, 0) as tcommunication, " +
+									"COALESCE(tstime, 0) as tstime, COALESCE(tscharges, 0) as tscharges, " +
+									"COALESCE(itemincart, 0) as itemincart, COALESCE(buying, 0) as buying, " +
+									"COALESCE(itemselling, 0) as itemselling,  administrator, " +
+									"namema, streetma, cityma, statema, zipma, phonenumber " +
+							"FROM (SELECT COUNT(pid) AS buying, buyerid AS uid " +
+	 							  "FROM product FULL OUTER JOIN customerorder USING (orderid) " +
+	 							  "GROUP BY buyerid) AS itembuying " +
+	 							  "FULL OUTER JOIN customer USING(uid) FULL OUTER JOIN (SELECT * FROM hasmailingaddress WHERE primaryoption = 'true') " +
+	 							  "as hasmailingaddress USING(uid) FULL OUTER JOIN mailingaddress using(maddressid) FULL OUTER JOIN " +
+	 							  "(select * from phonenumber  where primaryoption = 'true') as phonenumber using(uid) " +
+	 							  "FULL OUTER JOIN (SELECT uid, count(reviewid) as totalreviews, avg(rating) as rating, avg(ratingdescribed) as rdescribed, " +
+									"avg(ratingcommunication) as rcommunication, avg(ratingstime) as rstime, avg(ratingscharges) as rscharges, " +
+									"count(ratingdescribed) as tdescribed, count(ratingcommunication) as tcommunication, count(ratingstime) as tstime, " +
+									"count(ratingscharges) as tscharges, " +
+									"sum(case when reviewtype = 'Positive' then 1 else 0 end) as positive, " +
+									"sum(case when reviewtype = 'Neutral' then 1 else 0 end) as neutral, " +
+									"sum(case when reviewtype = 'Negative' then 1 else 0 end) as negative " +
+									"FROM review " +
+									"GROUP BY uid) as review using(uid) " +
+								  "NATURAL LEFT JOIN " +
+								 "(SELECT sellerid AS uid, count(sellerid) as itemSelling " +
+							"FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
+							"(SELECT auctionid, COUNT(auctionid) AS numberofbids " +
+							"FROM auction NATURAL JOIN bids " +
+							"GROUP BY auctionid) AS A " +
+							"WHERE pid IN (SELECT pid " +
+						      "FROM sale UNION (SELECT pid " +
+								        "FROM auction)) " +
+								        "GROUP BY sellerid) AS selling NATURAL JOIN (SELECT uid, COUNT(pid) AS itemincart " +
+					"FROM customer NATURAL LEFT JOIN shoppingcart " +
+					"GROUP BY uid) AS shoppingcart2 " +
 							 "WHERE uid = $1", [uid]);
 	
 	query.on("row", function (row, result) {
@@ -96,7 +115,7 @@ app.get('/ProjectServer/currentUserCart/:id', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT product.pid, pname, pmodel, pbrand, pcondition, ppricemethod, pprice, pdescription " +
+	var query = client.query("SELECT product.pid, pname, pmodel, pbrand, pcondition, ppricemethod, pprice, pdescription, sellerid, penddate " +
 							  "FROM (customer NATURAL JOIN shoppingcart), product " +
 							  "WHERE shoppingcart.pid = product.pid " +
 							  		"AND customer.uid = $1", [id]);
@@ -105,9 +124,16 @@ app.get('/ProjectServer/currentUserCart/:id', function(req, res) {
     	result.addRow(row);
 	});
 	query.on("end", function (result) {
-		var response = {"shoppingcart" : result.rows};
-		client.end();
-  		res.json(response);
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Cart not found.");
+		}
+		else {	
+			var response = {"shoppingcart" : result.rows};
+			client.end();
+	  		res.json(response);
+	  }
  	});
 });
 
@@ -142,38 +168,31 @@ app.get('/ProjectServer/user/:username/:password', function(req, res) {
  	});
 });
 
-// REST Operation - HTTP GET to read a product based on its id
-app.get('/ProjectServer/currentProductSeller/:id', function(req, res) {
-	var id = req.params.id;
-	console.log("GET product: " + id);
-
+// REST Operation - HTTP GET to read all categories
+app.get('/ProjectServer/categories', function(req, res) {
+	console.log("GET categories");
+	
 	var client = new pg.Client(conString);
 	client.connect();
 
 	var query = client.query("SELECT * " +
-							 "FROM customer NATURAL JOIN mailingaddress " +
-							 "WHERE uid = $1", [id]);
+							 "FROM category ");
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
 	});
 	query.on("end", function (result) {
-		var len = result.rows.length;
-		if (len == 0){
-			res.statusCode = 404;
-			res.send("Current seller not found.");
-		}
-		else {	
-  			var response = {"seller" : result.rows[0]};
-			client.end();
-  			res.json(response);
-  		}
+		var response = {"categories" : result.rows};
+		client.end();
+  		res.json(response);
  	});
 });
 
+
 // REST Operation - HTTP GET to read all products
-app.get('/ProjectServer/products', function(req, res) {
-	console.log("GET");
+app.get('/ProjectServer/searchResults/:searchInput', function(req, res) {
+	var searchInput = req.params.searchInput;
+	console.log("GET product search results: " + searchInput);
 	
 	var client = new pg.Client(conString);
 	client.connect();
@@ -185,7 +204,8 @@ app.get('/ProjectServer/products', function(req, res) {
 							 "GROUP BY auctionid) as A " +
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
-			        							"FROM auction))");
+			        							"FROM auction)) " +
+			        		 "AND pname ilike '%" + searchInput + "%'");
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -233,17 +253,17 @@ app.get('/ProjectServer/products/:id', function(req, res) {
 });
 
 // REST Operation - HTTP GET to read a product based on its id
-app.get('/ProjectServer/bidderList/:id', function(req, res) {
-	var id = req.params.id;
-	console.log("GET bidderList: " + id);
+app.get('/ProjectServer/bidderList/:pid', function(req, res) {
+	var pid = req.params.pid;
+	console.log("GET bidderList from product: " + pid);
 
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT username, userbidprice, userbidtime " +
-							 "FROM bids NATURAL JOIN customer NATURAL JOIN auction " +
+	var query = client.query("SELECT username, userbidprice, userbidtime, pname " +
+							 "FROM bids NATURAL JOIN customer NATURAL JOIN auction NATURAL JOIN product " +
 							 "WHERE pid = $1 " +
-							 "ORDER BY userbidprice desc", [id]);
+							 "ORDER BY userbidtime desc ", [pid]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -256,6 +276,34 @@ app.get('/ProjectServer/bidderList/:id', function(req, res) {
 		}
 		else {	
   			var response = {"bidderList" : result.rows};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
+
+app.get('/ProjectServer/bidderListSummary/:pid', function(req, res) {
+	var pid = req.params.pid;
+	console.log("GET bidderList: " + pid);
+
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT COUNT(*) AS numberofbids, COUNT(DISTINCT uid) AS bidders, MAX(userbidprice) AS highbidder " +
+							 "FROM bids NATURAL JOIN customer NATURAL JOIN auction " +
+							 "WHERE pid = $1 ", [pid]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Summary not found.");
+		}
+		else {	
+  			var response = {"bidderListSummary" : result.rows};
 			client.end();
   			res.json(response);
   		}
@@ -290,6 +338,67 @@ app.get('/ProjectServer/saleHistory/:id', function(req, res) {
   		}
  	});
 });
+
+app.get('/ProjectServer/orderHistory/:buyerId', function(req, res) {
+	var buyerId = req.params.buyerId;
+	console.log("GET order history of user: " + buyerId);
+
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	var query = client.query("SELECT namema, orderdate, orderid, COUNT(pid) AS orderitems " +
+							 "FROM product NATURAL JOIN customerorder NATURAL JOIN mailingaddress " +
+							 "WHERE buyerid = $1 " +
+							 "GROUP BY orderdate, namema, orderid " +
+							 "ORDER BY orderdate ", [buyerId]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Order History not found.");
+		}
+		else {	
+  			var response = {"orderhistory" : result.rows};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
+
+app.get('/ProjectServer/orderView/:buyerId/:orderId', function(req, res) {
+	var buyerId = req.params.buyerId;
+	var orderId = req.params.orderId;
+	console.log("GET order " + orderId + "of user " + buyerId);
+
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	var query = client.query("SELECT * " +
+							 "FROM product NATURAL JOIN customerorder NATURAL JOIN creditcard " +
+							 "JOIN billingaddress USING(baddressid) NATURAL JOIN mailingaddress " +
+							 "WHERE buyerid = $1 AND orderid = $2 ", [buyerId, orderId]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Order not found.");
+		}
+		else {	
+  			var response = {"orderView" : result.rows};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
+
 
 // REST Operation - HTTP PUT to updated a product based on its id
 app.put('/ProjectServer/products/:id', function(req, res) {
@@ -686,13 +795,22 @@ app.get('/ProjectServer/recentFeedback/:id', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 	
-	var query = client.query("SELECT reviewGiven.reviewid, reviewGiven.uid as uidr, customer.fname as fnameR, customer.lname as lnameR, customer.username as usernamer, reviewGiven.uidg, reviewGiven.fnameG, reviewGiven.lnameG, reviewGiven.usernameg, reviewGiven.subject, reviewGiven.feedback, reviewGiven.rating, reviewGiven.ratedate " +
-							 "FROM " +
-							 "(select review.reviewid, customer.fname as fnameG, customer.lname as lnameG, customer.username as usernameg, review.subject, review.feedback, review.rating, review.uid as uid, review.reviewgivenby as uidG, review.ratedate " +
-							 "from customer, review " + 
-							 "where customer.uid = review.reviewgivenby) as reviewGiven " +
-	      					 "join customer using(uid) " +
-			        							"where reviewGiven.uid = $1", [id]);
+	var query = client.query("SELECT reviewid, review.uid, reviewgivenby, username as usernameg, review.rating, reviewtype, feedback, ratedate " +
+							 "FROM customer, review " + 
+							 "WHERE reviewgivenby = customer.uid " +
+			        		 "AND review.uid = $1 " +
+			        		 "ORDER BY ratedate desc", [id]);
+			        							
+	// var query = client.query("SELECT reviewGiven.reviewid, reviewGiven.uid as uidr, customer.fname as fnameR, customer.lname as lnameR, " +
+								"customer.username as usernamer, reviewGiven.uidg, reviewGiven.fnameG, reviewGiven.lnameG, reviewGiven.usernameg, " +
+								"reviewGiven.subject, reviewGiven.feedback, reviewGiven.rating, reviewGiven.ratedate " +
+							 // "FROM " +
+							 // "(select review.reviewid, customer.fname as fnameG, customer.lname as lnameG, customer.username as usernameg, " + 
+							 "review.subject, review.feedback, review.rating, review.uid as uid, review.reviewgivenby as uidG, review.ratedate " +
+							 // "from customer, review " + 
+							 // "where customer.uid = review.reviewgivenby) as reviewGiven " +
+	      					 // "join customer using(uid) " +
+			        							// "where reviewGiven.uid = $1", [id]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -747,14 +865,15 @@ app.get('/ProjectServer/orderCategoryBy/:category/:orderType', function(req, res
  	});
 });
 
-app.get('/ProjectServer/orderSearchPage/:orderType', function(req, res) {
+app.get('/ProjectServer/orderSearchPage/:searchInput/:orderType', function(req, res) {
+	var searchInput = req.params.searchInput;
 	var orderType = req.params.orderType;
-	console.log("GET product from: " + orderType);
+	console.log("GET product order by: " + orderType);
 
 	var client = new pg.Client(conString);
 	client.connect();
 	
-	var query = client.query("SELECT *, GREATEST(pprice, currentbidprice) AS price " +
+	var query = client.query("SELECT * " +
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
@@ -762,6 +881,7 @@ app.get('/ProjectServer/orderSearchPage/:orderType', function(req, res) {
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
 			        							"FROM auction)) " +
+			        		 "AND pname ilike '%" + searchInput + "%' " +
 			        		 "ORDER BY " + orderType);
 	
 	query.on("row", function (row, result) {
@@ -771,7 +891,43 @@ app.get('/ProjectServer/orderSearchPage/:orderType', function(req, res) {
 		var len = result.rows.length;
 		if (len == 0){
 			res.statusCode = 404;
-			res.send("Category not found.");
+			res.send("Product not found.");
+		}
+		else {	
+  			var response = {"orderType" : result.rows};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
+
+app.get('/ProjectServer/itemsSalePage/:sellerId/:orderType', function(req, res) {
+	var sellerId = req.params.sellerId;
+	var orderType = req.params.orderType;
+	console.log("GET item sale product  order by: " + orderType);
+
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	var query = client.query("SELECT * " +
+							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
+							 "(SELECT auctionid, count(auctionid) as numberofbids " +
+							 "FROM auction NATURAL JOIN bids " + 
+							 "GROUP BY auctionid) as A " +
+							 "WHERE pid in (select pid " +
+	      					 	"FROM sale UNION (select pid " +
+			        							"FROM auction))" +
+			        			"AND sellerid = $1 " +
+			        			"ORDER BY " + orderType , [sellerId]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Product not found.");
 		}
 		else {	
   			var response = {"orderType" : result.rows};
