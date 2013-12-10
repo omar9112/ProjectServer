@@ -1,8 +1,37 @@
 // Express is the web framework 
 var express = require('express');
 var pg = require('pg').native;
-var app = express();
+var app = express(),
+path = require('path'),
+    fs = require('fs');
   
+function getDateTime() {
+    var now     = new Date(); 
+    var year    = now.getFullYear();
+    var month   = now.getMonth()+1; 
+    var day     = now.getDate();
+    var hour    = now.getHours();
+    var minute  = now.getMinutes();
+    var second  = now.getSeconds(); 
+    if(month.toString().length == 1) {
+        var month = '0'+month;
+    }
+    if(day.toString().length == 1) {
+        var day = '0'+day;
+    }   
+    if(hour.toString().length == 1) {
+        var hour = '0'+hour;
+    }
+    if(minute.toString().length == 1) {
+        var minute = '0'+minute;
+    }
+    if(second.toString().length == 1) {
+        var second = '0'+second;
+    }   
+    var dateTime = year+'/'+month+'/'+day+' '+hour+':'+minute+':'+second;   
+    return dateTime;
+}
+
 // Database connection string: pg://<username>:<password>@host:port/dbname 
 var conString = "pg://fjupgmyvemqepn:cubKJkYRU__l8azH1vtHXngBjJ@ec2-54-204-17-24.compute-1.amazonaws.com:5432/da7jluqsdd1u63";
 
@@ -25,13 +54,36 @@ app.configure(function () {
 });
 
 // configure Express
-app.configure(function() {
-  app.use(express.bodyParser());
-});
+// app.configure(function() {
+  // app.use(express.bodyParser());
+// });
 
 var product = require("./product.js");
 var Product = product.Product;
 
+app.use(express.bodyParser({uploadDir:'/Users/omar91/Sites/ProjectServer/tmp'}));
+
+// ...
+// app.post('/upload', function (req, res) {
+    // var tempPath = req.files.file.path,
+        // targetPath = path.resolve('./uploads/image.png');
+    // if (path.extname(req.files.file.name).toLowerCase() === '.png') {
+        // fs.rename(tempPath, targetPath, function(err) {
+            // if (err) throw err;
+            // console.log("Upload completed!");
+        // });
+    // } else {
+        // fs.unlink(tempPath, function () {
+            // if (err) throw err;
+            // console.error("Only .png files are allowed!");
+        // });
+    // }
+    // // ...
+// });
+
+app.get('/image.png', function (req, res) {
+    res.sendfile(path.resolve('./uploads/image.png'));
+}); 
 
 // REST Operations
 // Idea: Data is created, read, updated, or deleted through a URL that 
@@ -58,14 +110,15 @@ app.get('/ProjectServer/currentUser/:uid', function(req, res) {
 									"COALESCE(tdescribed, 0) as tdescribed, COALESCE(tcommunication, 0) as tcommunication, " +
 									"COALESCE(tstime, 0) as tstime, COALESCE(tscharges, 0) as tscharges, " +
 									"COALESCE(itemincart, 0) as itemincart, COALESCE(buying, 0) as buying, " +
-									"COALESCE(itemselling, 0) as itemselling,  administrator, " +
-									"namema, streetma, cityma, statema, zipma, phonenumber " +
+									"COALESCE(itemselling, 0) as itemselling,  administrator, deleted, " +
+									"maddressid, namema, streetma, cityma, statema, zipma, hasmailingaddress.primaryoption as poptionma, phonenumber, cardid " +
 							"FROM (SELECT COUNT(pid) AS buying, buyerid AS uid " +
 	 							  "FROM product FULL OUTER JOIN customerorder USING (orderid) " +
 	 							  "GROUP BY buyerid) AS itembuying " +
-	 							  "FULL OUTER JOIN customer USING(uid) FULL OUTER JOIN (SELECT * FROM hasmailingaddress WHERE primaryoption = 'true') " +
-	 							  "as hasmailingaddress USING(uid) FULL OUTER JOIN mailingaddress using(maddressid) FULL OUTER JOIN " +
-	 							  "(select * from phonenumber  where primaryoption = 'true') as phonenumber using(uid) " +
+	 							  "FULL OUTER JOIN customer USING(uid) FULL OUTER JOIN (SELECT * FROM hasmailingaddress WHERE primaryoption = 1) " +
+	 							  "as hasmailingaddress USING(uid) FULL OUTER JOIN mailingaddress using(maddressid) " +
+	 							  "FULL OUTER JOIN (select * from creditcard where primaryoption = 1) as creditcard using(uid) FULL OUTER JOIN " +
+	 							  "(select * from phonenumber where primaryoption = 'true') as phonenumber using(uid) " +
 	 							  "FULL OUTER JOIN (SELECT uid, count(reviewid) as totalreviews, avg(rating) as rating, avg(ratingdescribed) as rdescribed, " +
 									"avg(ratingcommunication) as rcommunication, avg(ratingstime) as rstime, avg(ratingscharges) as rscharges, " +
 									"count(ratingdescribed) as tdescribed, count(ratingcommunication) as tcommunication, count(ratingstime) as tstime, " +
@@ -97,6 +150,10 @@ app.get('/ProjectServer/currentUser/:uid', function(req, res) {
 		if (len == 0){
 			res.statusCode = 404;
 			res.send("User not found.");
+		}
+		else if (result.rows[0].deleted == 1) {
+			res.statusCode = 409;
+			res.send("User was deleted.");
 		}
 		else {	
   			var response = {"currentUser" : result.rows[0]};
@@ -137,6 +194,65 @@ app.get('/ProjectServer/currentUserCart/:id', function(req, res) {
  	});
 });
 
+app.get('/ProjectServer/shoppingcart/:uid/:pid', function(req, res) {
+	var uid = req.params.uid;
+	var pid = req.params.pid;
+	console.log("GET");
+	
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT pid " +
+							  "FROM shoppingcart " +
+							  "WHERE pid = $1 " +
+							  "AND uid = $2 ", [pid, uid]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("No product with that id in shopping cart.");
+		}
+		else {	
+			var response = {"shoppingcart" : result.rows};
+			client.end();
+	  		res.json(response);
+	  }
+ 	});
+});
+
+app.get('/ProjectServer/cartInfo/:id', function(req, res) {
+	var id = req.params.id;
+	console.log("GET");
+	
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	var query = client.query("SELECT COALESCE(totalprice, 0) as totalprice, COALESCE(totalitems, 0) as totalitems " +
+							  "FROM ( SELECT sum(pprice) as totalprice, count(sid) as totalItems " +
+							  "FROM shoppingcart NATURAL JOIN product " +
+							  		"WHERE uid = $1) AS cartinfo ", [id]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Cart info not found.");
+		}
+		else {	
+			var response = {"shoppingcart" : result.rows};
+			client.end();
+	  		res.json(response);
+	  }
+ 	});
+});
+
 // REST Operation - HTTP GET to read a product based on its id
 app.get('/ProjectServer/user/:username/:password', function(req, res) {
 	var username = req.params.username;
@@ -147,7 +263,7 @@ app.get('/ProjectServer/user/:username/:password', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT uid " +
+	var query = client.query("SELECT uid, deleted " +
 							 "FROM customer " +
 							 "WHERE username = $1 AND upassword = $2", [username, password]);
 	
@@ -157,8 +273,13 @@ app.get('/ProjectServer/user/:username/:password', function(req, res) {
 	query.on("end", function (result) {
 		var len = result.rows.length;
 		if (len == 0){
-			res.statusCode = 404;
+			res.statusCode = 500;
 			res.send("User not found.");
+		}
+		else if (result.rows[0].deleted == 1) {
+			console.log('2 ' + result.rows[0].deleted);
+			res.statusCode = 409;
+			res.send("User was deleted.");
 		}
 		else {	
   			var response = {"user" : result.rows[0]};
@@ -399,99 +520,61 @@ app.get('/ProjectServer/orderView/:buyerId/:orderId', function(req, res) {
  	});
 });
 
+app.get('/ProjectServer/creditCard/:cardid', function(req, res) {
+	var cardid = req.params.cardid;
+	console.log("GET credit card  " + cardid);
 
-// REST Operation - HTTP PUT to updated a product based on its id
-app.put('/ProjectServer/products/:id', function(req, res) {
-	var id = req.params.id;
-	console.log("PUT product: " + id);
-
-	if ((id < 0) || (id >= productNextId)){
-		// not found
-		res.statusCode = 404;
-		res.send("Product not found.");
-	}
-	else if(!req.body.hasOwnProperty('name') || !req.body.hasOwnProperty('model') || !req.body.hasOwnProperty('brand')
-  	|| !req.body.hasOwnProperty('category') || !req.body.hasOwnProperty('condition') || !req.body.hasOwnProperty('priceMethod')
-  	|| !req.body.hasOwnProperty('price') || !req.body.hasOwnProperty('description')) {
-    	res.statusCode = 400;
-    	return res.send('Error: Missing fields for product.');
-  	}
-	else {
-		var target = -1;
-		for (var i=0; i < productList.length; ++i){
-			if (productList[i].id == id){
-				target = i;
-				break;	
-			}
-		}
-		if (target == -1){
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	var query = client.query("SELECT * " +
+							 "FROM creditcard NATURAL JOIN customer NATURAL JOIN billingaddress " +
+							 "WHERE cardid = $1 ", [cardid]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
 			res.statusCode = 404;
-			res.send("Product not found.");			
-		}	
-		else {
-			var theProduct= productList[target];
-			theProduct.name = req.body.name;
-			theProduct.model = req.body.model;
-			theProduct.brand = req.body.brand;
-			theProduct.category = req.body.category;
-			theProduct.condition = req.body.condition;
-			theProduct.priceMethod = req.body.priceMethod;
-			theProduct.price = req.body.price;
-			theProduct.description = req.body.description;
-			var response = {"product" : theProduct};
-  			res.json(response);		
+			res.send("Credit Card not found.");
+		}
+		else {	
+  			var response = {"creditCard" : result.rows};
+			client.end();
+  			res.json(response);
   		}
-	}
+ 	});
 });
 
-// REST Operation - HTTP DELETE to delete a product based on its id
-app.del('/ProjectServer/products/:id', function(req, res) {
-	var id = req.params.id;
-		console.log("DELETE product: " + id);
+app.get('/ProjectServer/recentOrder/:uid', function(req, res) {
+	var uid = req.params.uid;
+	console.log("GET recent order from user  " + req.params.uid);
 
-	if ((id < 0) || (id >= productNextId)){
-		// not found
-		res.statusCode = 404;
-		res.send("Product not found.");
-	}
-	else {
-		var target = -1;
-		for (var i=0; i < productList.length; ++i){
-			if (productList[i].id == id){
-				target = i;
-				break;	
-			}
-		}
-		if (target == -1){
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	var query = client.query("SELECT MAX(orderid) " +
+							 "FROM customerorder " +
+							 "WHERE buyerid = $1 ", [uid]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
 			res.statusCode = 404;
-			res.send("Product not found.");			
-		}	
-		else {
-			productList.splice(target, 1);
-  			res.json(true);
-  		}		
-	}
+			res.send("Order not found.");
+		}
+		else {	
+  			var response = {"order" : result.rows[0]};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
 });
-
-// REST Operation - HTTP POST to add a new a product
-app.post('/ProjectServer/products', function(req, res) {
-	console.log("POST");
-
-  	if(!req.body.hasOwnProperty('name') || !req.body.hasOwnProperty('model') || !req.body.hasOwnProperty('brand')
-  	|| !req.body.hasOwnProperty('category') || !req.body.hasOwnProperty('condition') || !req.body.hasOwnProperty('priceMethod')
-  	|| !req.body.hasOwnProperty('price') || !req.body.hasOwnProperty('description')) {
-    	res.statusCode = 400;
-    	return res.send('Error: Missing fields for product.');
-  	}
-
-  	var newProduct = new Product(req.body.name, req.body.model, req.body.brand, req.body.category, 
-  								 req.body.condition, req.body.priceMethod, req.body.price, req.body.description);
-  	console.log("New Product: " + JSON.stringify(newProduct));
-  	newProduct.id = productNextId++;
-  	productList.push(newProduct);
-  	res.json(true);
-});
-
 
 /*
  * ################################## USER ##################################
@@ -517,138 +600,420 @@ app.get('/ProjectServer/users', function(req, res) {
   	res.json(response);
 });
 
-// REST Operation - HTTP GET to read a user based on its id
-app.get('/ProjectServer/users/:id', function(req, res) {
-	var id = req.params.id;
-		console.log("GET user: " + id);
+// REST Operation - HTTP POST to add a new a user
+app.post('/ProjectServer/users', function(req, res) {
+	console.log("Before" + req.body.username);
 
-	if ((id < 0) || (id >= userNextId)){
-		// not found
-		res.statusCode = 404;
-		res.send("User not found.");
-	}
-	else {
-		var target = -1;
-		for (var i=0; i < userList.length; ++i){
-			if (userList[i].id == id){
-				target = i;
-				break;	
-			}
-		}
-		if (target == -1){
-			res.statusCode = 404;
-			res.send("User not found.");
-		}
-		else {
-			var response = {"user" : userList[target]};
-  			res.json(response);	
-  		}	
-	}
+	console.log("POST");
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	if (!req.body.username || !req.body.upassword || !req.body.fname || !req.body.lname || !req.body.email){
+    	res.statusCode = 400;
+    	res.send('Error: Missing fields for user.');
+ 	}
+ 	else {
+	 		    // console.log(JSON.stringify(req.files));
+
+	    // var tempPath = req.files.file.path,
+	        // targetPath = path.resolve('./uploads/image.png');
+	    // if (path.extname(req.files.file.name).toLowerCase() === '.png') {
+	        // fs.rename(tempPath, targetPath, function(err) {
+	            // if (err) throw err;
+	            // console.log("Upload completed!");
+	        // });
+	    // } else {
+	        // fs.unlink(tempPath, function () {
+	            // if (err) throw err;
+	            // console.error("Only .png files are allowed!");
+	        // });
+	    // }
+//  	
+		var admin = 'false', deleted = 0;
+        var query = client.query('INSERT INTO customer (username, upassword, fname, lname, email, administrator, deleted) ' +
+		'VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING uid ', [req.body.username, req.body.upassword, req.body.fname, req.body.lname, req.body.email, admin, deleted], 
+        function(err, result) {
+        	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: Data fields for user.');
+            } else {
+                console.log('row inserted with id: ' + result.rows[0].uid);
+                var response = {"uid" : result.rows[0].uid};
+                client.end();
+				res.json(response);
+            }
+           }); 
+   }
 });
 
 // REST Operation - HTTP PUT to updated a user based on its id
-app.put('/ProjectServer/users/:id', function(req, res) {
+app.put('/ProjectServer/user/:id', function(req, res) {
 	var id = req.params.id;
-		console.log("PUT user: " + id);
-
-	if ((id < 0) || (id >= userNextId)){
-		// not found
-		res.statusCode = 404;
-		res.send("User not found.");
-	}
-	else if(!req.body.hasOwnProperty('username') || !req.body.hasOwnProperty('password') || !req.body.hasOwnProperty('firstName')
-	|| !req.body.hasOwnProperty('lastName') || !req.body.hasOwnProperty('streetMailingAddress') || !req.body.hasOwnProperty('cityMailingAddress')
-	|| !req.body.hasOwnProperty('stateMailingAddress') || !req.body.hasOwnProperty('zipMailingAddress') || !req.body.hasOwnProperty('streetBillingAddress')
-	|| !req.body.hasOwnProperty('cityBillingAddress') || !req.body.hasOwnProperty('stateBillingAddress') || !req.body.hasOwnProperty('zipBillingAddress')
-	|| !req.body.hasOwnProperty('telephone') || !req.body.hasOwnProperty('email') ) {
-    	res.statusCode = 400;
-    	return res.send('Error: Missing fields for user.');
-  	}
-	else {
-		var target = -1;
-		for (var i=0; i < userList.length; ++i){
-			if (userList[i].id == id){
-				target = i;
-				break;	
-			}
-		}
-		if (target == -1){
-			res.statusCode = 404;
-			res.send("User not found.");			
-		}	
-		else {
-			var theUser= userList[target];
-			theUser.username = req.body.username;
-			theUser.password = req.body.password;
-			theUser.firstName = req.body.firstName;
-			theUser.lastName = req.body.lastName;
-			theUser.streetMailingAddress = req.body.streetMailingAddress;
-			theUser.cityMailingAddress = req.body.cityMailingAddress;
-			theUser.stateMailingAddress = req.body.stateMailingAddress;
-			theUser.zipMailingAddress = req.body.zipMailingAddress;
-			theUser.streetBillingAddress = req.body.streetBillingAddress;
-			theUser.cityBillingAddress = req.body.cityBillingAddress;
-			theUser.stateBillingAddress = req.body.stateBillingAddress;
-			theUser.zipBillingAddress = req.body.zipBillingAddress;
-			theUser.telephone = req.body.telephone;
-			theUser.email = req.body.email;
-			theUser.rating = req.body.rating;
-			var response = {"user" : theUser};
-  			res.json(response);		
-  		}
-	}
+	console.log("PUT user: " + id);
+	
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	if (!req.body.updemail || !req.body.updpassword){
+    	 res.statusCode = 404;
+    	res.send('Error: Missing fields for user.');
+ 	}
+ 	else {
+        var query = client.query('UPDATE customer SET (email, upassword) = ' +
+ 								'($1, $2) ' +
+								'WHERE uid = $3 ', [req.body.updemail, req.body.updpassword, id], 
+        function(err, result) {
+        	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: User could not be updated.');
+            } else {
+                client.end();
+				res.json('Success');            
+				}
+       }); 
+       
+       }
 });
 
-// REST Operation - HTTP DELETE to delete a user based on its id
-app.del('/ProjectServer/users/:id', function(req, res) {
+// REST Operation - HTTP PUT to updated a user based on its id
+app.put('/ProjectServer/user/delete/:id', function(req, res) {
 	var id = req.params.id;
-		console.log("DELETE user: " + id);
+	console.log("PUT user: " + id);
+	
+	var client = new pg.Client(conString);
+	client.connect();
+ 	
+    var query = client.query('UPDATE customer SET (deleted) = (1) ' +
+								'WHERE uid = $1 ', [id], 
+    function(err, result) {
+        if (err) {
+            console.log(err);
+            res.statusCode = 500;
+            console.log(res.statusCode);
+            res.send('Error: User could not be updated.');
+        } else {
+                client.end();
+				res.json('Success');            
+				}
+       }); 
+       
+       
+});
 
-	if ((id < 0) || (id >= userNextId)){
-		// not found
-		res.statusCode = 404;
-		res.send("User not found.");
-	}
-	else {
-		var target = -1;
-		for (var i=0; i < userList.length; ++i){
-			if (userList[i].id == id){
-				target = i;
-				break;	
-			}
-		}
-		if (target == -1){
-			res.statusCode = 404;
-			res.send("User not found.");			
-		}	
-		else {
-			userList.splice(target, 1);
-  			res.json(true);
-  		}		
-	}
+app.post('/ProjectServer/addMailingAddress/:option', function(req, res) {
+	
+	var option = req.params.option;
+	console.log("POST");
+	var client = new pg.Client(conString);
+	client.connect();
+
+        var query = client.query('BEGIN TRANSACTION; ' +
+        'WITH rows AS (INSERT INTO mailingaddress (namema, streetma, cityma, statema, zipma) ' +
+        "VALUES ('" + req.body.fistLastName + "', '"  + req.body.streetMa + "', '"  + req.body.cityMa + "', '"  + req.body.stateMa + "', '"  + req.body.zipMa + "') RETURNING maddressid) " +
+        'INSERT INTO hasmailingaddress (uid, maddressid, primaryoption) ' +
+        "VALUES (" + req.body.uid + ", (SELECT maddressid FROM rows), " + option +
+        '); ' + 
+        'INSERT INTO phonenumber (phonenumber, uid, primaryoption) ' +
+        "VALUES ('" + req.body.phoneNumberMa + "', '"  + req.body.uid + "', '"  + option + "'); " +
+        'END TRANSACTION; ', 
+        function(err, result) {
+        	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: .');
+            } else {
+                client.end();
+				res.json('Success');
+            }
+           }); 
+ });
+
+app.post('/ProjectServer/addCreditCard/:option', function(req, res) {
+	
+	var option = req.params.option;	//"to_date('" +  req.body.cardExp + "', 'Mon-YYYY + "')"
+	console.log("POST Credit Card");
+	var client = new pg.Client(conString);
+	client.connect();
+		console.log(req.body.cardExp);
+		
+        var query = client.query('BEGIN TRANSACTION; ' +
+        'WITH rows AS (INSERT INTO billingaddress (nameba, streetba, cityba, stateba, zipba, uid) ' +
+        "VALUES ('" + req.body.fistLastNameCD + "', '"  + req.body.streetBa + "', '" + req.body.cityBa + "', '"  +
+        req.body.stateBa + "', '" + req.body.zipBa + "', " + req.body.uid + ") RETURNING baddressid) " +
+        'INSERT INTO creditcard (cardnumber, svn, uid, nameoncard, cardtype, baddressid, primaryoption, expirationdate) ' +
+        "VALUES ('" + req.body.card_number + "', " + req.body.svn + ", " + req.body.uid + ", '" +
+        req.body.fistLastNameCD + "', '" + req.body.cardType + "', (SELECT baddressid FROM rows), " + option + ", '" + req.body.cardExp + "'" +
+        '); ' + 
+        'END TRANSACTION; ', 
+        function(err, result) {
+        	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: .');
+            } else {
+                client.end();
+				res.json('Success');
+            }
+           }); 
+ });
+
+// Creating new order
+// app.post('/ProjectServer/customerOrder', function(req, res) {
+	// console.log("POST");
+	// console.log("Before" + req.body.buyerid);
+// 
+	// var client = new pg.Client(conString);
+	// client.connect();
+// 	
+	// // if (!req.body.username || !req.body.upassword || !req.body.fname || !req.body.lname || !req.body.email){
+    	// // res.statusCode = 400;
+    	// // res.send('Error: Missing fields for user.');
+ 	// // }
+ 	// // else {
+// 
+        // var query = client.query('INSERT INTO customerorder (buyerid, orderdate, status, shippingoption, cardid, maddressid) ' +
+		// 'VALUES ($1, $2, $3, $4, $5, $6) RETURNING orderid ', [req.body.buyerid, req.body.orderdate, req.body.status, req.body.shippingoption, req.body.cardid, req.body.maddressid], 
+        // function(err, result) {
+        	// if (err) {
+            	// console.log(err);
+                // res.statusCode = 500;
+                // console.log(res.statusCode);
+                // res.send('Error: Data fields for user.');
+            // } else {
+                // console.log('row inserted with id: ' + result.rows[0].orderid);
+                // var response = {"orderid" : result.rows[0].orderid};
+                // // var response = result.rows[0].uid;	
+                // client.end();
+				// res.json(response);
+            // }
+           // }); 
+   // //}
+// });
+
+app.post('/ProjectServer/customerOrder', function(req, res) {
+	console.log("POST Customer Order");
+
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	// if (!req.body.username || !req.body.upassword || !req.body.fname || !req.body.lname || !req.body.email){
+    	// res.statusCode = 400;
+    	// res.send('Error: Missing fields for user.');
+ 	// }
+ 	// else {
+
+        var query = client.query('BEGIN TRANSACTION; ' +
+        						'WITH rows AS (INSERT INTO customerorder (buyerid, orderdate, status, shippingoption, cardid, maddressid) ' +
+								'VALUES (' + "'" + req.body.buyerid + "', '" + req.body.orderdate + "', '" + req.body.status + "', '" + req.body.shippingoption + "', '" + req.body.cardid + "', '" + req.body.maddressid + "'" + ') RETURNING orderid) ' +
+								'UPDATE product SET orderid = (SELECT orderid ' +
+								'FROM rows) ' +
+								'WHERE pid IN (SELECT pid ' + 
+									      'FROM shoppingcart ' +
+									      'WHERE uid = ' + req.body.buyerid + '); ' +
+								'DELETE FROM sale ' +
+								'WHERE pid in (SELECT pid ' +
+									      'FROM shoppingcart ' +
+									      'WHERE uid = ' + req.body.buyerid + '); ' +
+								'DELETE FROM shoppingcart ' +
+								'WHERE uid = ' + req.body.buyerid + '; ' +
+								'END TRANSACTION;', 
+        function(err, result) {
+        	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: customer order.');
+            } else {
+                // console.log('row inserted with id: ' + result.rows[0].orderid);
+                // var response = {"orderid" : result.rows[0].orderid};
+                // var response = result.rows[0].uid;	
+                client.end();
+				res.json('success');
+            }
+           }); 
+   //}
+});
+
+app.post('/ProjectServer/customerOrderbuyitnow', function(req, res) {
+	console.log("POST Customer Order from buy it now");
+
+	var client = new pg.Client(conString);
+	client.connect();
+	
+    var query = client.query("BEGIN TRANSACTION; " +
+        					 "WITH rows AS (INSERT INTO customerorder (buyerid, orderdate, status, shippingoption, cardid, maddressid) " +
+							 "VALUES (" + req.body.buyerid + ", '" + getDateTime() + "', '"  + req.body.status + "', '" + req.body.shippingoption + "', " + req.body.cardid + "," + req.body.maddressid + ") RETURNING orderid) " +
+							 "UPDATE product SET orderid = (SELECT orderid " +
+							 "FROM rows) " +
+							 "WHERE pid = '" + req.body.pid + "'; " +
+							 "DELETE FROM sale " +
+							 "WHERE pid = '" + req.body.pid + "'; " +
+							 "DELETE FROM shoppingcart " +
+							 "WHERE pid = '" + req.body.pid + "'; " +
+							 "END TRANSACTION; ", 
+        function(err, result) {
+        	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: customer order from buy it now.');
+            } else {
+                client.end();
+				res.json('success');
+            }
+           }); 
+});
+
+
+
+app.post('/ProjectServer/bidonproduct/:auctionid/:uid/:userbidprice', function(req, res) {
+	var auctionid = req.params.auctionid;
+	var uid = req.params.uid;
+	var userbidprice = req.params.userbidprice;
+	
+	var client = new pg.Client(conString);
+	client.connect();
+	
+    var query = client.query('BEGIN TRANSACTION; ' +
+        					 'INSERT INTO bids (auctionid, uid, userbidprice, userbidtime) ' +
+							 "VALUES ('" + auctionid + "', '" + uid + "', '" + userbidprice + "', '" + getDateTime() + "'); " +
+							 "UPDATE auction SET currentbidprice = (" + userbidprice + ") " +
+							 "WHERE auctionid = " + auctionid  + "; " +
+							 "END TRANSACTION; ", 
+    function(err, result) {
+    	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: Data fields for user.');
+        } else {
+                client.end();
+				res.json('response');
+            }
+           }); 
+});
+
+app.del('/ProjectServer/shoppingcart/:uid', function(req, res) {
+	console.log("POST");
+	var uid = req.params.uid;
+	var client = new pg.Client(conString);
+	client.connect();
+
+        var query = client.query('DELETE FROM shoppingcart ' +
+								'WHERE uid = $1 ', [uid], 
+        function(err, result) {
+        	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: Data fields for user.');
+            } else {
+                // console.log('row inserted with id: ' + result.rows[0].orderid);
+                // var response = {"orderid" : result.rows[0].orderid};
+                // var response = result.rows[0].uid;	
+                client.end();
+				res.json('response');
+            }
+           }); 
+   //}
+});
+
+app.del('/ProjectServer/deleteItemCart/:uid/:pid', function(req, res) {
+	console.log("POST");
+	var uid = req.params.uid;
+	var pid = req.params.pid;
+	var client = new pg.Client(conString);
+	client.connect();
+
+        var query = client.query('DELETE FROM shoppingcart ' +
+								'WHERE uid = $1 AND pid = $2', [uid, pid], 
+        function(err, result) {
+        	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: Data fields for user.');
+            } else {
+                // console.log('row inserted with id: ' + result.rows[0].orderid);
+                // var response = {"orderid" : result.rows[0].orderid};
+                // var response = result.rows[0].uid;	
+                client.end();
+				res.json('response');
+            }
+           }); 
+   //}
 });
 
 // REST Operation - HTTP POST to add a new a user
-app.post('/ProjectServer/users', function(req, res) {
-	console.log("POST");
+app.post('/ProjectServer/shoppingcart/:uid/:pid', function(req, res) {
+	var uid = req.params.uid;
+	var pid = req.params.pid;
+	
+	console.log("Added to shopping cart" + pid);
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	// if (!req.body.username || !req.body.upassword || !req.body.fname || !req.body.lname || !req.body.email){
+    	// res.statusCode = 400;
+    	// res.send('Error: Missing fields for user.');
+ 	// }
+ 	// else {
+        var query = client.query('INSERT INTO shoppingcart (uid, pid) ' +
+								 'VALUES ($1, $2) ', [uid, pid], 
+        function(err, result) {
+        	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: Data fields for user.');
+            } else {
+                // console.log('row inserted with id: ' + result.rows[0].uid);
+                // var response = {"uid" : result.rows[0].uid};
+                // var response = result.rows[0].uid;	
+                client.end();
+				res.json('response');
+            }
+           }); 
+   // }
+});
 
-  	if(!req.body.hasOwnProperty('username') || !req.body.hasOwnProperty('password') || !req.body.hasOwnProperty('firstName')
-	|| !req.body.hasOwnProperty('lastName') || !req.body.hasOwnProperty('streetMailingAddress') || !req.body.hasOwnProperty('cityMailingAddress')
-	|| !req.body.hasOwnProperty('stateMailingAddress') || !req.body.hasOwnProperty('zipMailingAddress') || !req.body.hasOwnProperty('streetBillingAddress')
-	|| !req.body.hasOwnProperty('cityBillingAddress') || !req.body.hasOwnProperty('stateBillingAddress') || !req.body.hasOwnProperty('zipBillingAddress')
-	|| !req.body.hasOwnProperty('telephone') || !req.body.hasOwnProperty('email')){
-    	res.statusCode = 400;
-    	return res.send('Error: Missing fields for user.');
-  	}
+// Updating products with orderid
+app.put('/ProjectServer/orderProduct/:orderid/:uid', function(req, res) {
+	var orderid = req.params.orderid;
+	var uid = req.params.uid;
 
-  	var newUser = new User(req.body.username, req.body.password, req.body.firstName, req.body.lastName,
-  		req.body.streetMailingAddress, req.body.cityMailingAddress, req.body.stateMailingAddress,
-  		req.body.zipMailingAddress, req.body.streetBillingAddress, req.body.cityBillingAddress ,
-  		req.body.stateBillingAddress, req.body.zipBillingAddress, req.body.telephone, req.body.email, 0);
-  	console.log("New User: " + JSON.stringify(newUser));
-  	newUser.id = userNextId++;
-  	userList.push(newUser);
-  	res.json(true);
+	console.log("PUT orderid: " + orderid + " " + uid);
+	
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	// if (!req.body.updemail || !req.body.updpassword){
+    	 // res.statusCode = 404;
+    	// res.send('Error: Missing fields for user.');
+ 	// }
+ 	// else {
+        var query = client.query('UPDATE product SET (orderid) = ' +
+ 								'($1) ' +
+								'WHERE pid IN (SELECT pid FROM shoppingcart WHERE uid = $2) ', [orderid, uid], 
+        function(err, result) {
+        	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: User could not be updated.');
+            } else {
+                client.end();
+				res.json('Success');            
+				}
+       }); 
+       
+       // }
 });
 
 // REST Operation - HTTP GET to read all products
@@ -782,6 +1147,35 @@ app.get('/ProjectServer/reportList/:reportDate', function(req, res) {
 		}
 		else {	
   			var response = {"reportList" : result.rows};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
+
+// REST Operation - HTTP GET to get a user based on username (for administrator)
+app.get('/ProjectServer/user/:username', function(req, res) {
+	var username = req.params.username;
+	console.log("GET user: " + username);
+
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	var query = client.query("SELECT uid, deleted " +
+							 "FROM customer " +
+							 "WHERE username = $1", [username]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("report date not found.");
+		}
+		else {	
+  			var response = {"user" : result.rows[0]};
 			client.end();
   			res.json(response);
   		}
