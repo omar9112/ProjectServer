@@ -2,8 +2,9 @@
 var express = require('express');
 var pg = require('pg').native;
 var app = express(),
+bcrypt = require('bcrypt'),
 path = require('path'),
-    fs = require('fs');
+   fs = require('fs');
   
 function getDateTime() {
     var now     = new Date(); 
@@ -80,10 +81,10 @@ app.use(express.bodyParser({uploadDir:'/Users/omar91/Sites/ProjectServer/tmp'}))
     // }
     // // ...
 // });
-
-app.get('/image.png', function (req, res) {
-    res.sendfile(path.resolve('./uploads/image.png'));
-}); 
+// 
+// app.get('/image.png', function (req, res) {
+    // res.sendfile(path.resolve('./uploads/image.png'));
+// }); 
 
 // REST Operations
 // Idea: Data is created, read, updated, or deleted through a URL that 
@@ -110,14 +111,14 @@ app.get('/ProjectServer/currentUser/:uid', function(req, res) {
 									"COALESCE(tdescribed, 0) as tdescribed, COALESCE(tcommunication, 0) as tcommunication, " +
 									"COALESCE(tstime, 0) as tstime, COALESCE(tscharges, 0) as tscharges, " +
 									"COALESCE(itemincart, 0) as itemincart, COALESCE(buying, 0) as buying, " +
-									"COALESCE(itemselling, 0) as itemselling,  administrator, deleted, " +
+									"COALESCE(itemselling, 0) as itemselling,  administrator, customer.deleted, " +
 									"maddressid, namema, streetma, cityma, statema, zipma, hasmailingaddress.primaryoption as poptionma, phonenumber, cardid " +
 							"FROM (SELECT COUNT(pid) AS buying, buyerid AS uid " +
 	 							  "FROM product FULL OUTER JOIN customerorder USING (orderid) " +
 	 							  "GROUP BY buyerid) AS itembuying " +
 	 							  "FULL OUTER JOIN customer USING(uid) FULL OUTER JOIN (SELECT * FROM hasmailingaddress WHERE primaryoption = 1) " +
 	 							  "as hasmailingaddress USING(uid) FULL OUTER JOIN mailingaddress using(maddressid) " +
-	 							  "FULL OUTER JOIN (select * from creditcard where primaryoption = 1) as creditcard using(uid) FULL OUTER JOIN " +
+	 							  "FULL OUTER JOIN (select * from creditcard where primaryoption = 1 AND deleted != 1) as creditcard using(uid) FULL OUTER JOIN " +
 	 							  "(select * from phonenumber where primaryoption = 'true') as phonenumber using(uid) " +
 	 							  "FULL OUTER JOIN (SELECT uid, count(reviewid) as totalreviews, avg(rating) as rating, avg(ratingdescribed) as rdescribed, " +
 									"avg(ratingcommunication) as rcommunication, avg(ratingstime) as rstime, avg(ratingscharges) as rscharges, " +
@@ -253,19 +254,17 @@ app.get('/ProjectServer/cartInfo/:id', function(req, res) {
  	});
 });
 
-// REST Operation - HTTP GET to read a product based on its id
 app.get('/ProjectServer/user/:username/:password', function(req, res) {
 	var username = req.params.username;
-	var password = req.params.password;
-
-	console.log("GET user: " + username + ", " + password);
+	var userSuppliedPassword = req.params.password;
+	console.log("GET user: " + username);
 
 	var client = new pg.Client(conString);
 	client.connect();
 
-	var query = client.query("SELECT uid, deleted " +
+	var query = client.query("SELECT uid, upassword, deleted " +
 							 "FROM customer " +
-							 "WHERE username = $1 AND upassword = $2", [username, password]);
+							 "WHERE username = $1 ", [username]);
 	
 	query.on("row", function (row, result) {
     	result.addRow(row);
@@ -277,15 +276,148 @@ app.get('/ProjectServer/user/:username/:password', function(req, res) {
 			res.send("User not found.");
 		}
 		else if (result.rows[0].deleted == 1) {
-			console.log('2 ' + result.rows[0].deleted);
+			console.log('Deleted ' + result.rows[0].deleted);
 			res.statusCode = 409;
 			res.send("User was deleted.");
 		}
 		else {	
-  			var response = {"user" : result.rows[0]};
-			client.end();
-  			res.json(response);
+			console.log(userSuppliedPassword);
+			console.log(result.rows[0].upassword);
+			  bcrypt.compare(userSuppliedPassword, result.rows[0].upassword, function(err, doesMatch){
+			  if (doesMatch){
+			  	console.log("Login");
+			    var response = {"user" : result.rows[0]};
+				client.end();
+  				res.json(response);
+			  }else{
+			  	 res.statusCode = 500;
+			     res.send("Wrong.");
+			  }
+			 });			
   		}
+ 	});
+});
+
+
+app.get('/ProjectServer/verifyCurrentPassword/:id/:password', function(req, res) {
+	var id = req.params.id;
+	var userSuppliedPassword = req.params.password;
+	console.log("GET compare password: " + id);
+
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT upassword " +
+							 "FROM customer " +
+							 "WHERE uid = $1 ", [id]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("User not found.");
+		}
+		else {	
+			  bcrypt.compare(userSuppliedPassword, result.rows[0].upassword, function(err, doesMatch){
+			  if (doesMatch){
+			  	console.log("Match");
+			    // var response = {"user" : result.rows[0]};
+				client.end();
+  				res.json('Match');
+			  }else{
+			  	 res.statusCode = 500;
+			     res.send("No Match.");
+			  }
+			 });			
+  		}
+ 	});
+});
+
+// REST Operation - HTTP GET to get a user based on username (for administrator) 
+app.get('/ProjectServer/user/:username', function(req, res) { 
+	var username = req.params.username; 
+	console.log("GET user: " + username); 
+	
+	var client = new pg.Client(conString); 
+	client.connect(); 
+	
+	var query = client.query("SELECT uid, deleted " + 
+							"FROM customer " + 
+							"WHERE username = $1", [username]); 
+	
+	query.on("row", function (row, result) { 
+	result.addRow(row); 
+	}); 
+	query.on("end", function (result) { 
+	var len = result.rows.length; 
+	if (len == 0){ 
+	res.statusCode = 404; 
+	res.send("report date not found."); 
+	} 
+	else {	
+	var response = {"user" : result.rows[0]}; 
+	client.end(); 
+	res.json(response); 
+	} 
+	}); 
+}); 
+
+app.get('/ProjectServer/getShippingAddresses/:id', function(req, res) {
+	var id = req.params.id;
+	console.log("GET Shipping Addresses");
+	
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT * " +
+							 "FROM mailingaddress NATURAL JOIN hasmailingaddress JOIN phonenumber USING(phoneid) " +
+							 "WHERE hasmailingaddress.uid = $1 ", [id]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("No shipping addrres found.");
+		}
+		else {	
+			var response = {"shippingaddress" : result.rows};
+			client.end();
+	  		res.json(response);
+	  }
+ 	});
+});
+
+app.get('/ProjectServer/getCreditCard/:id', function(req, res) {
+	var id = req.params.id;
+	console.log("GET Credit Card");
+	
+	var client = new pg.Client(conString);
+	client.connect();
+
+	var query = client.query("SELECT * " +
+							 "FROM creditcard NATURAL JOIN billingaddress JOIN phonenumber USING (phoneid) " +
+							 "WHERE creditcard.uid = $1 AND creditcard.deleted != 1", [id]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("No credit card found.");
+		}
+		else {	
+			var response = {"creditcard" : result.rows};
+			client.end();
+	  		res.json(response);
+	  }
  	});
 });
 
@@ -628,10 +760,10 @@ app.post('/ProjectServer/users', function(req, res) {
 	            // console.error("Only .png files are allowed!");
 	        // });
 	    // }
-//  	
+	  	var password_hash = bcrypt.hashSync(req.body.upassword, 10);
 		var admin = 'false', deleted = 0;
         var query = client.query('INSERT INTO customer (username, upassword, fname, lname, email, administrator, deleted) ' +
-		'VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING uid ', [req.body.username, req.body.upassword, req.body.fname, req.body.lname, req.body.email, admin, deleted], 
+		'VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING uid ', [req.body.username, password_hash, req.body.fname, req.body.lname, req.body.email, admin, deleted], 
         function(err, result) {
         	if (err) {
             	console.log(err);
@@ -656,14 +788,15 @@ app.put('/ProjectServer/user/:id', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 	
-	if (!req.body.updemail || !req.body.updpassword){
-    	 res.statusCode = 404;
-    	res.send('Error: Missing fields for user.');
- 	}
- 	else {
+	// if (!req.body.updemail || !req.body.updpassword){
+    	// res.statusCode = 404;
+    	// res.send('Error: Missing fields for user.');
+ 	// }
+ 	// else {
+ 		var password_hash = bcrypt.hashSync(req.body.updpassword, 10);
         var query = client.query('UPDATE customer SET (email, upassword) = ' +
  								'($1, $2) ' +
-								'WHERE uid = $3 ', [req.body.updemail, req.body.updpassword, id], 
+								'WHERE uid = $3 ', [req.body.updemail, password_hash, id], 
         function(err, result) {
         	if (err) {
             	console.log(err);
@@ -676,8 +809,33 @@ app.put('/ProjectServer/user/:id', function(req, res) {
 				}
        }); 
        
-       }
+       // }
 });
+
+// REST Operation - HTTP PUT to updated a user based on its id 
+app.put('/ProjectServer/user/delete/:id', function(req, res) { 
+	var id = req.params.id; 
+	console.log("PUT user: " + id); 
+	
+	var client = new pg.Client(conString); 
+	client.connect(); 
+	
+	var query = client.query('UPDATE customer SET (deleted) = (1) ' + 
+							 'WHERE uid = $1 ', [id], 
+	function(err, result) { 
+	if (err) { 
+	console.log(err); 
+	res.statusCode = 500; 
+	console.log(res.statusCode); 
+	res.send('Error: User could not be updated.'); 
+	} else { 
+	client.end(); 
+	res.json('Success'); 
+	} 
+	}); 
+
+
+}); 
 
 app.post('/ProjectServer/addMailingAddress/:option', function(req, res) {
 	
@@ -723,6 +881,7 @@ app.post('/ProjectServer/addCreditCard/:option', function(req, res) {
         'INSERT INTO creditcard (cardnumber, svn, uid, nameoncard, cardtype, baddressid, primaryoption, expirationdate) ' +
         "VALUES ('" + req.body.card_number + "', " + req.body.svn + ", " + req.body.uid + ", '" +
         req.body.fistLastNameCD + "', '" + req.body.cardType + "', (SELECT baddressid FROM rows), " + option + ", '" + req.body.cardExp + "'" +
+        "INSERT INTO phonenumber () " +
         '); ' + 
         'END TRANSACTION; ', 
         function(err, result) {
@@ -968,11 +1127,6 @@ app.put('/ProjectServer/orderProduct/:orderid/:uid', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 	
-	// if (!req.body.updemail || !req.body.updpassword){
-    	 // res.statusCode = 404;
-    	// res.send('Error: Missing fields for user.');
- 	// }
- 	// else {
         var query = client.query('UPDATE product SET (orderid) = ' +
  								'($1) ' +
 								'WHERE pid IN (SELECT pid FROM shoppingcart WHERE uid = $2) ', [orderid, uid], 
@@ -987,10 +1141,58 @@ app.put('/ProjectServer/orderProduct/:orderid/:uid', function(req, res) {
 				res.json('Success');            
 				}
        }); 
-       
-       // }
 });
 
+app.del('/ProjectServer/deleteShippingAddress/:maddressid', function(req, res) {
+	var maddressid = req.params.maddressid;
+
+	console.log("DELETE deleteShippingAddress: " + maddressid);
+	
+	var client = new pg.Client(conString);
+	client.connect();
+	
+        var query = client.query('DELETE FROM hasmailingaddress ' +
+ 								 'WHERE maddressid = $1 ', [maddressid], 
+        function(err, result) {
+        	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: Mailing address could not be deleted.');
+            } else {
+                client.end();
+				res.json('Success');            
+				}
+       }); 
+});
+
+app.put('/ProjectServer/deleteCreditCard/:cardid/:baddressid', function(req, res) {
+	var cardid = req.params.cardid;
+	var baddressid = req.params.baddressid;
+
+	console.log("DELETE deleteCreditCard: " + cardid);
+	
+	var client = new pg.Client(conString);
+	client.connect();
+
+        var query = client.query('BEGIN TRANSACTION; ' +
+        						 'UPDATE creditcard SET (deleted) = (1) ' +
+        						 "WHERE cardid = " + cardid + "; " +
+								 'UPDATE billingaddress SET (deleted) = (1) '+
+								 "WHERE baddressid = " + baddressid + "; " +
+								 'END TRANSACTION; ', 
+        function(err, result) {
+        	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: Credit card could not be deleted.');
+            } else {
+                client.end();
+				res.json('Success');            
+				}
+       }); 
+});
 // REST Operation - HTTP GET to read all products
 app.get('/ProjectServer/itemsforsale/:id', function(req, res) {
 	var id = req.params.id;
@@ -1213,7 +1415,7 @@ app.get('/ProjectServer/orderSearchPage/:searchInput/:orderType', function(req, 
 	var client = new pg.Client(conString);
 	client.connect();
 	
-	var query = client.query("SELECT * " +
+	var query = client.query("SELECT *, GREATEST(pprice, currentbidprice) AS price " +
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
@@ -1249,7 +1451,7 @@ app.get('/ProjectServer/itemsSalePage/:sellerId/:orderType', function(req, res) 
 	var client = new pg.Client(conString);
 	client.connect();
 	
-	var query = client.query("SELECT * " +
+	var query = client.query("SELECT *, GREATEST(pprice, currentbidprice) AS price " +
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
