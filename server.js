@@ -119,7 +119,7 @@ app.get('/ProjectServer/currentUser/:uid', function(req, res) {
 	 							  "FULL OUTER JOIN customer USING(uid) FULL OUTER JOIN (SELECT * FROM hasmailingaddress WHERE primaryoption = 1) " +
 	 							  "as hasmailingaddress USING(uid) FULL OUTER JOIN mailingaddress using(maddressid) " +
 	 							  "FULL OUTER JOIN (select * from creditcard where primaryoption = 1 AND deleted != 1) as creditcard using(uid) FULL OUTER JOIN " +
-	 							  "(select * from phonenumber where primaryoption = 'true') as phonenumber using(uid) " +
+	 							  "(select * from phonenumber where primaryoption = 1) as phonenumber using(uid) " +
 	 							  "FULL OUTER JOIN (SELECT uid, count(reviewid) as totalreviews, avg(rating) as rating, avg(ratingdescribed) as rdescribed, " +
 									"avg(ratingcommunication) as rcommunication, avg(ratingstime) as rstime, avg(ratingscharges) as rscharges, " +
 									"count(ratingdescribed) as tdescribed, count(ratingcommunication) as tcommunication, count(ratingstime) as tstime, " +
@@ -482,7 +482,7 @@ app.get('/ProjectServer/products/:id', function(req, res) {
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
-							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory " +
+							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory NATURAL JOIN category " +
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
 			        							"FROM auction))" +
@@ -504,6 +504,40 @@ app.get('/ProjectServer/products/:id', function(req, res) {
   		}
  	});
 });
+
+// app.get('/ProjectServer/getProductById/:pid', function(req, res) {
+	// var id = req.params.id;
+	// console.log("GET product: " + id);
+// 
+	// var client = new pg.Client(conString);
+	// client.connect();
+// 	
+	// var query = client.query("SELECT DISTINCT ON (pid) * " +
+							 // "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
+							 // "(SELECT auctionid, count(auctionid) as numberofbids " +
+							 // "FROM auction NATURAL JOIN bids " + 
+							 // "GROUP BY auctionid) as A NATURAL JOIN hasCategory NATURAL JOIN category " +
+							 // "WHERE pid in (select pid " +
+	      					 	// "FROM sale UNION (select pid " +
+			        							// "FROM auction))" +
+			        							// "AND pid = $1 ", [id]);
+// 	
+	// query.on("row", function (row, result) {
+    	// result.addRow(row);
+	// });
+	// query.on("end", function (result) {
+		// var len = result.rows.length;
+		// if (len == 0){
+			// res.statusCode = 404;
+			// res.send("Product not found.");
+		// }
+		// else {	
+  			// var response = {"product" : result.rows[0]};
+			// client.end();
+  			// res.json(response);
+  		// }
+ 	// });
+// });
 
 // REST Operation - HTTP GET to read a product based on its id
 app.get('/ProjectServer/bidderList/:pid', function(req, res) {
@@ -725,18 +759,9 @@ var User = usercopy.User;
 // c) PUT - Update an individual object, or collection  (Database update operation)
 // d) DELETE - Remove an individual object, or collection (Database delete operation)
 
-// REST Operation - HTTP GET to read all users
-app.get('/ProjectServer/users', function(req, res) {
-	console.log("GET");
-	var response = {"users" : userList};
-  	res.json(response);
-});
-
 // REST Operation - HTTP POST to add a new a user
 app.post('/ProjectServer/users', function(req, res) {
-	console.log("Before" + req.body.username);
-
-	console.log("POST");
+	console.log("POST a new user");
 	var client = new pg.Client(conString);
 	client.connect();
 	
@@ -745,21 +770,6 @@ app.post('/ProjectServer/users', function(req, res) {
     	res.send('Error: Missing fields for user.');
  	}
  	else {
-	 		    // console.log(JSON.stringify(req.files));
-
-	    // var tempPath = req.files.file.path,
-	        // targetPath = path.resolve('./uploads/image.png');
-	    // if (path.extname(req.files.file.name).toLowerCase() === '.png') {
-	        // fs.rename(tempPath, targetPath, function(err) {
-	            // if (err) throw err;
-	            // console.log("Upload completed!");
-	        // });
-	    // } else {
-	        // fs.unlink(tempPath, function () {
-	            // if (err) throw err;
-	            // console.error("Only .png files are allowed!");
-	        // });
-	    // }
 	  	var password_hash = bcrypt.hashSync(req.body.upassword, 10);
 		var admin = 'false', deleted = 0;
         var query = client.query('INSERT INTO customer (username, upassword, fname, lname, email, administrator, deleted) ' +
@@ -780,6 +790,115 @@ app.post('/ProjectServer/users', function(req, res) {
    }
 });
 
+// REST Operation - HTTP POST to add a new product
+app.post('/ProjectServer/products', function(req, res) {
+	console.log("POST a product " + req.body.productName);
+	
+	pg.connect(conString, function(err, client, done) {
+	  if(err) {
+	    console.log('error fetching client from pool', err);
+	  }
+	  else {
+		  	client.query('INSERT INTO product (pname, pmodel, pbrand, pprice, pdescription, sellerid, pcondition, ppricemethod, penddate) ' +
+									 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING pid ', [req.body.productName, req.body.productModel, req.body.productBrand,
+			req.body.productPrice, req.body.productDescription, req.body.sellerid, req.body.productCondition, req.body.productPriceMethod, req.body.productEndDate], 
+	        function(err, result) {
+	        	if (err) {
+	            	console.log(err);
+	                res.statusCode = 500;
+	                console.log(res.statusCode);
+	                res.send('Error: Product could not be added.');
+	            } else {
+	            	console.log('row inserted with id: ' + result.rows[0].pid);
+	                var response = {"pid" : result.rows[0].pid};
+	                client.end();
+					res.json(response);
+	           }
+	       });
+		 }
+	});
+});
+
+app.post('/ProjectServer/productsSale/:pid', function(req, res) {
+	var pid = req.params.pid;
+	console.log("POST a product to a sale " + req.body.productName);
+	
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	var query2 = client.query('INSERT INTO sale (pid) ' +
+	               		 	'VALUES ($1) ', [pid], 
+	        function(err, result) {
+	        	if (err) {
+	            	console.log(err);
+	                res.statusCode = 500;
+	                console.log(res.statusCode);
+	                res.send('Error: Product could not be added.');
+	            } else {
+	               	for(var i = 0; i < req.body.productCategory.length; i++) {
+	               		var client2 = new pg.Client(conString);
+						client2.connect();
+	               		var query2 = client2.query('UPDATE product SET pfinalprice = (SELECT pprice FROM product WHERE pid = $1) ' +
+	               								   'WHERE pid = $2 ' +
+	               								   'INSERT INTO hascategory (pid, categoryid) ' +
+												   'VALUES ($3, $4) ', [pid, pid, pid, req.body.productCategory[i]], 
+				        function(err2, result2) {
+				        	if (err2) {
+				            	console.log(err2);
+				                res.statusCode = 300;
+				                console.log(res.statusCode);
+				                res.send('Error: Category could not be added.');
+				            } else {
+				            	client2.end();
+								res.json('Category Added');
+				            }
+				        }); 
+	     			};
+	                client.end();
+					res.json('Category Added');
+	           }
+	       });
+});
+
+app.post('/ProjectServer/productsAuction/:pid', function(req, res) {
+	var pid = req.params.pid;
+	console.log("POST a product to an auction " + req.body.productName);
+	
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	var query2 = client.query('INSERT INTO auction (pid, currentbidprice) ' +
+	               		 	'VALUES ($1, $2) ', [pid, req.body.productPrice], 
+	        function(err, result) {
+	        	if (err) {
+	            	console.log(err);
+	                res.statusCode = 500;
+	                console.log(res.statusCode);
+	                res.send('Error: Product could not be added to auction.');
+	            } else {
+	               	for(var i = 0; i < req.body.productCategory.length; i++) {
+	               		var client2 = new pg.Client(conString);
+						client2.connect();
+	               		var query2 = client2.query('INSERT INTO hascategory (pid, categoryid) ' +
+												   'VALUES ($1, $2) ', [pid, req.body.productCategory[i]], 
+				        function(err2, result2) {
+				        	if (err2) {
+				            	console.log(err2);
+				                res.statusCode = 300;
+				                console.log(res.statusCode);
+				                res.send('Error: Category could not be added.');
+				            } else {
+				            	client2.end();
+								res.json('Category Added');
+				            }
+				        }); 
+	     			};
+	                client.end();
+					res.json('Category Added');
+	           }
+	       });
+});
+
 // REST Operation - HTTP PUT to updated a user based on its id
 app.put('/ProjectServer/user/:id', function(req, res) {
 	var id = req.params.id;
@@ -787,12 +906,7 @@ app.put('/ProjectServer/user/:id', function(req, res) {
 	
 	var client = new pg.Client(conString);
 	client.connect();
-	
-	// if (!req.body.updemail || !req.body.updpassword){
-    	// res.statusCode = 404;
-    	// res.send('Error: Missing fields for user.');
- 	// }
- 	// else {
+
  		var password_hash = bcrypt.hashSync(req.body.updpassword, 10);
         var query = client.query('UPDATE customer SET (email, upassword) = ' +
  								'($1, $2) ' +
@@ -936,11 +1050,7 @@ app.post('/ProjectServer/customerOrder', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 	
-	// if (!req.body.username || !req.body.upassword || !req.body.fname || !req.body.lname || !req.body.email){
-    	// res.statusCode = 400;
-    	// res.send('Error: Missing fields for user.');
- 	// }
- 	// else {
+
 
         var query = client.query('BEGIN TRANSACTION; ' +
         						'WITH rows AS (INSERT INTO customerorder (buyerid, orderdate, status, shippingoption, cardid, maddressid) ' +
@@ -1278,7 +1388,7 @@ app.get('/ProjectServer/categories/:category', function(req, res) {
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
-							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory " +
+							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory NATURAL JOIN category " +
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
 			        							"FROM auction)) " +
@@ -1383,7 +1493,7 @@ app.get('/ProjectServer/orderCategoryBy/:category/:orderType', function(req, res
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
-							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory " +
+							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory NATURAL JOIN category" +
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
 			        							"FROM auction)) " +
@@ -1473,6 +1583,128 @@ app.get('/ProjectServer/itemsSalePage/:sellerId/:orderType', function(req, res) 
 		}
 		else {	
   			var response = {"orderType" : result.rows};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
+
+// REST Operation - HTTP POST to add a category
+app.post('/ProjectServer/addCategory/:category', function(req, res) {
+	var category = req.params.category;
+	console.log("POST category: " + category);
+	
+	var client = new pg.Client(conString);
+	client.connect();
+ 	
+    var query = client.query('INSERT into category (categoryname, deleted) ' +
+    'VALUES($1, 0)', [category], 
+    function(err, result) {
+        if (err) {
+            console.log(err);
+            res.statusCode = 500;
+            console.log(res.statusCode);
+            res.send('Error: Data could not be updated.');
+        } else {
+                client.end();
+				res.json('Success');            
+				}
+       });      
+});
+
+// REST Operation - HTTP PUT to update a category 
+app.put('/ProjectServer/updateCategory/:oldCategory/:newCategory', function(req, res) { 
+	var oldCategory = req.params.oldCategory; 
+	var newCategory = req.params.newCategory; 
+	console.log("PUT category: " + newCategory); 
+	
+	var client = new pg.Client(conString); 
+	client.connect(); 
+	
+	var query = client.query('UPDATE category SET categoryname = $1 ' + 
+							 'WHERE categoryname = $2', [newCategory, oldCategory], 
+	function(err, result) { 
+	if (err) { 
+	console.log(err); 
+	res.statusCode = 500; 
+	console.log(res.statusCode); 
+	res.send('Error: Category could not be updated.'); 
+	} else { 
+	client.end(); 
+	res.json('Success'); 
+	} 
+	}); 
+}); 
+
+
+// // REST Operation - HTTP PUT to updated a user based on its id 
+// app.put('/ProjectServer/user/delete/:id', function(req, res) { 
+	// var id = req.params.id; 
+	// console.log("PUT user: " + id); 
+// 	
+	// var client = new pg.Client(conString); 
+	// client.connect(); 
+// 	
+	// var query = client.query('UPDATE customer SET (deleted) = (1) ' + 
+							 // 'WHERE uid = $1 ', [id], 
+	// function(err, result) { 
+	// if (err) { 
+	// console.log(err); 
+	// res.statusCode = 500; 
+	// console.log(res.statusCode); 
+	// res.send('Error: User could not be updated.'); 
+	// } else { 
+	// client.end(); 
+	// res.json('Success'); 
+	// } 
+	// }); 
+// 
+// 
+// }); 
+
+// REST Operation - HTTP PUT to remove a category 
+app.put('/ProjectServer/removeCategory/:category', function(req, res) { 
+	console.log("PUT category: "); 
+	var category = req.params.category; 
+	
+	var client = new pg.Client(conString); 
+	client.connect(); 
+	
+	var query = client.query('UPDATE category SET (deleted) = (1) ' + 
+							 'WHERE categoryname = $1 ', [category], 
+	function(err, result) { 
+	if (err) { 
+	console.log(err); 
+	res.statusCode = 500; 
+	console.log(res.statusCode); 
+	res.send('Error: Category could not be updated.'); 
+	} else { 
+	client.end(); 
+	res.json('Success'); 
+	} 
+	}); 
+}); 
+
+app.get('/ProjectServer/findCategory/:category', function(req, res) {
+	var category = req.params.category;
+	console.log("GET category: " + category);
+
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	var query = client.query("SELECT * FROM category WHERE categoryname = $1 and deleted = 0", [category]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Category not found");
+		}
+		else {	
+  			var response = {"category" : result.rows[0]};
 			client.end();
   			res.json(response);
   		}
