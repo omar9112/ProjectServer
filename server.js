@@ -457,7 +457,7 @@ app.get('/ProjectServer/searchResults/:searchInput', function(req, res) {
 							 "GROUP BY auctionid) as A " +
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
-			        							"FROM auction)) " +
+			        							"FROM auction WHERE auction.deleted != 1)) " +
 			        		 "AND pname ilike '%" + searchInput + "%'");
 	
 	query.on("row", function (row, result) {
@@ -482,10 +482,10 @@ app.get('/ProjectServer/products/:id', function(req, res) {
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
-							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory NATURAL JOIN category " +
+							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory JOIN category using(categoryid)" +
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
-			        							"FROM auction))" +
+			        							"FROM auction WHERE auction.deleted != 1))" +
 			        							"AND pid = $1 ", [id]);
 	
 	query.on("row", function (row, result) {
@@ -633,10 +633,10 @@ app.get('/ProjectServer/orderHistory/:buyerId', function(req, res) {
 	var client = new pg.Client(conString);
 	client.connect();
 	
-	var query = client.query("SELECT namema, orderdate, orderid, COUNT(pid) AS orderitems " +
+	var query = client.query("SELECT namema, orderdate, orderid, status, COUNT(pid) AS orderitems " +
 							 "FROM product NATURAL JOIN customerorder NATURAL JOIN mailingaddress " +
 							 "WHERE buyerid = $1 " +
-							 "GROUP BY orderdate, namema, orderid " +
+							 "GROUP BY orderdate, namema, orderid, status " +
 							 "ORDER BY orderdate ", [buyerId]);
 	
 	query.on("row", function (row, result) {
@@ -736,6 +736,35 @@ app.get('/ProjectServer/recentOrder/:uid', function(req, res) {
 		}
 		else {	
   			var response = {"order" : result.rows[0]};
+			client.end();
+  			res.json(response);
+  		}
+ 	});
+});
+
+app.get('/ProjectServer/higherBidder/:pid', function(req, res) {
+	var pid = req.params.pid;
+	console.log("GET recent order from product  " + pid);
+
+	var client = new pg.Client(conString);
+	client.connect();
+	
+	var query = client.query("SELECT pid, auctionid, uid, userbidprice " +
+							 "FROM product NATURAL JOIN bids " +
+							 "WHERE userbidprice IN (SELECT MAX(userbidprice) AS currentbidprice " +
+							 "FROM auction NATURAL JOIN bids WHERE pid = $1) AND  pid = $2 ", [pid, pid]);
+	
+	query.on("row", function (row, result) {
+    	result.addRow(row);
+	});
+	query.on("end", function (result) {
+		var len = result.rows.length;
+		if (len == 0){
+			res.statusCode = 404;
+			res.send("Product not found.");
+		}
+		else {	
+  			var response = {"higherBidderItems" : result.rows[0]};
 			client.end();
   			res.json(response);
   		}
@@ -1114,6 +1143,35 @@ app.post('/ProjectServer/customerOrderbuyitnow', function(req, res) {
            }); 
 });
 
+app.post('/ProjectServer/customerOrderBid/:uid/:pid', function(req, res) {
+	var uid = req.params.uid;
+	var pid = req.params.pid;
+	console.log("POST Customer Order from bid");
+
+	var client = new pg.Client(conString);
+	client.connect();
+	
+    var query = client.query("BEGIN TRANSACTION; " +
+        					 "WITH rows AS (INSERT INTO customerorder (buyerid, orderdate, status, shippingoption) " +
+							 "VALUES (" + uid + ", '" + getDateTime() + "', 'incompleted', 'Standard') RETURNING orderid) " +
+							 "UPDATE product SET orderid = (SELECT orderid " +
+							 "FROM rows) " +
+							 "WHERE pid = '" + pid + "'; " +
+							 "UPDATE auction SET (deleted) = (1) " +
+							 "WHERE pid = '" + pid + "'; " +
+							 "END TRANSACTION; ", 
+        function(err, result) {
+        	if (err) {
+            	console.log(err);
+                res.statusCode = 500;
+                console.log(res.statusCode);
+                res.send('Error: customer order frombid.');
+            } else {
+                client.end();
+				res.json('success');
+            }
+           }); 
+});
 
 
 app.post('/ProjectServer/bidonproduct/:auctionid/:uid/:userbidprice', function(req, res) {
@@ -1142,6 +1200,8 @@ app.post('/ProjectServer/bidonproduct/:auctionid/:uid/:userbidprice', function(r
             }
            }); 
 });
+
+
 
 app.del('/ProjectServer/shoppingcart/:uid', function(req, res) {
 	console.log("POST");
@@ -1388,10 +1448,10 @@ app.get('/ProjectServer/categories/:category', function(req, res) {
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
-							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory NATURAL JOIN category " +
+							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory JOIN category using(categoryid)" +
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
-			        							"FROM auction)) " +
+			        							"FROM auction WHERE auction.deleted != 1)) " +
 			        							"AND categoryname = $1", [category]);
 	
 	query.on("row", function (row, result) {
@@ -1493,10 +1553,10 @@ app.get('/ProjectServer/orderCategoryBy/:category/:orderType', function(req, res
 							 "FROM product NATURAL LEFT JOIN auction NATURAL LEFT JOIN " +
 							 "(SELECT auctionid, count(auctionid) as numberofbids " +
 							 "FROM auction NATURAL JOIN bids " + 
-							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory NATURAL JOIN category" +
+							 "GROUP BY auctionid) as A NATURAL JOIN hasCategory JOIN category using(categoryid)" +
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
-			        							"FROM auction)) " +
+			        							"FROM auction WHERE auction.deleted != 1)) " +
 			        							"AND categoryname = $1 " +
 			        		 "ORDER BY " + orderType, [category]);
 	
@@ -1532,7 +1592,7 @@ app.get('/ProjectServer/orderSearchPage/:searchInput/:orderType', function(req, 
 							 "GROUP BY auctionid) as A " +
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
-			        							"FROM auction)) " +
+			        							"FROM auction WHERE auction.deleted != 1)) " +
 			        		 "AND pname ilike '%" + searchInput + "%' " +
 			        		 "ORDER BY " + orderType);
 	
@@ -1568,7 +1628,7 @@ app.get('/ProjectServer/itemsSalePage/:sellerId/:orderType', function(req, res) 
 							 "GROUP BY auctionid) as A " +
 							 "WHERE pid in (select pid " +
 	      					 	"FROM sale UNION (select pid " +
-			        							"FROM auction))" +
+			        							"FROM auction WHERE auction.deleted != 1))" +
 			        			"AND sellerid = $1 " +
 			        			"ORDER BY " + orderType , [sellerId]);
 	
